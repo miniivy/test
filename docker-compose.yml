@@ -1,0 +1,13 @@
+version: '2'
+services:
+  web:
+    image: nginx:latest
+    ports:
+    - 64963:80/tcp
+    labels:
+      traefik.frontend.rule: PathPrefixStrip:/photo,Host:junho.kollus.com
+      traefik.enable: 'true'
+      traefik.backend: nginx
+      io.rancher.scheduler.affinity:host_label: hostname=dv02kb03
+      traefik.port: '80'
+      traefik.domain: junho.kollus.com
