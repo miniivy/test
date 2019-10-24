@@ -10,4 +10,4 @@ services:
       traefik.backend: nginx
       io.rancher.scheduler.affinity:host_label: hostname=dv02kb03
       traefik.port: '80'
-      traefik.domain: junho.kollus.com
+      traefik.domain: junho1.kollus.com
