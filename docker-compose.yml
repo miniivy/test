@@ -5,7 +5,7 @@ services:
     ports:
     - 64963:80/tcp
     labels:
-      traefik.frontend.rule: PathPrefixStrip:/photo,Host:junho.kollus.com
+      traefik.frontend.rule: PathPrefixStrip:/photo,Host:junho1.kollus.com
       traefik.enable: 'true'
       traefik.backend: nginx
       io.rancher.scheduler.affinity:host_label: hostname=dv02kb03
