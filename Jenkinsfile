@@ -1,7 +1,7 @@
 pipeline {
   agent any
   stages {
-    stage('') {
+    stage('Bulid') {
       steps {
         sh 'ls'
       }
