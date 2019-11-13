@@ -3,7 +3,7 @@ pipeline {
   stages {
     stage('Bulid') {
       steps {
-        sh 'ls'
+        sh 'ls -l'
       }
     }
 
