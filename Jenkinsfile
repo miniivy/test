@@ -1,10 +1,20 @@
 pipeline {
-    agent any 
+    agent any
+ 
     stages {
-        stage('Stage 1') {
+        stage('build') {
             steps {
-                echo 'Hello world!' 
+                sh 'build check'
             }
+        }
+    }
+ 
+    post {
+        always {
+            junit '**/target/*.xml'
+        }
+        failure {
+            mail to:  junho@catenoid.net, subject: 'Pipeline fail email'
         }
     }
 }
