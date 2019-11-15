@@ -1,12 +1,10 @@
 pipeline {
-  agent any
-  stages {
-    stage('Bulid') {
-      steps {
-        sh 'ls'
-        sh 'ls'        
-      }
+    agent any 
+    stages {
+        stage('Stage 1') {
+            steps {
+                echo 'Hello world!' 
+            }
+        }
     }
-
-  }
 }
