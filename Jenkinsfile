@@ -8,13 +8,4 @@ pipeline {
             }
         }
     }
- 
-    post {
-        always {
-            junit '**/target/*.xml'
-        }
-        failure {
-            mail to: junho@catenoid.net, subject: 'Pipeline fail email'
-        }
-    }
 }
