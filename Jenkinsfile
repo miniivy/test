@@ -14,7 +14,7 @@ pipeline {
             junit '**/target/*.xml'
         }
         failure {
-            mail to:  junho@catenoid.net, subject: 'Pipeline fail email'
+            mail to: junho@catenoid.net, subject: 'Pipeline fail email'
         }
     }
 }
