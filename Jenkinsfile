@@ -7,7 +7,7 @@ node {
             
             stage 'Checkout'
         
-            git url: 'https://github.com/grugrut/golang-ci-jenkins-pipeline.git'
+            git url: 'https://github.com/miniivy/test.git'
         
             stage 'preTest'
             sh 'go version'
