@@ -1,28 +1,15 @@
-
-node {
-    def root = tool name: 'Go1.8', type: 'go'
-    ws("${JENKINS_HOME}/jobs/${JOB_NAME}/builds/${BUILD_ID}/src/github.com/grugrut/golang-ci-jenkins-pipeline") {
-        withEnv(["GOROOT=${root}", "GOPATH=${JENKINS_HOME}/jobs/${JOB_NAME}/builds/${BUILD_ID}/", "PATH+GO=${root}/bin"]) {
-            env.PATH="${GOPATH}/bin:$PATH"
-            
-            stage 'Checkout'
-        
-            git url: 'https://github.com/miniivy/test.git'
-        
-            stage 'preTest'
-            sh 'go version'
-            sh 'go get -u github.com/golang/dep/...'
-            sh 'dep init'
-            
-            stage 'Test'
-            sh 'go vet'
-            sh 'go test -cover'
-            
-            stage 'Build'
-            sh 'go build .'
-            
-            stage 'Deploy'
-            // Do nothing.
-        }
-    }
-}
+podTemplate(
+    label: 'mypod',
+    volumes: [
+        emptyDirVolume(mountPath: '/etc/gitrepo', memory: false),
+        hostPathVolume(mountPath: '/var/run/docker.sock', hostPath: '/var/run/docker.sock')
+    ],
+    containers:
+    [
+        containerTemplate(name: 'git', image: 'alpine/git', ttyEnabled: true, command: 'cat'),
+        containerTemplate(name: 'python', image: 'python:3.7.2', command: 'cat', ttyEnabled: true),
+        containerTemplate(name: 'docker', image: 'docker', command: 'cat', ttyEnabled: true,
+            envVars: [secretEnvVar(key: 'DOCKER_HUB_PASSWORD', secretName: 'docker-hub-password', secretKey: 'DOCKER_HUB_PASSWORD')]
+        )
+    ]
+)
