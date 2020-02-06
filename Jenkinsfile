@@ -6,7 +6,6 @@ podTemplate(
     ],
     containers:
     [
-        containerTemplate(name: 'git', image: 'alpine/git', ttyEnabled: true, command: 'cat'),
-        containerTemplate(name: 'python', image: 'python:3.7.2', command: 'cat', ttyEnabled: true)
+        containerTemplate(name: 'git', image: 'alpine/git', ttyEnabled: true, command: 'cat')
     ]
 )
