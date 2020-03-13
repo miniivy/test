@@ -30,7 +30,7 @@ podTemplate(label: 'mypod', containers: [
                 dir('hello-world-war/') {
                     sh 'hostname'
                     sh 'hostname -i'
-                    sh 'mvn clean install'
+                    sh 'mvn clean in1stall'
                 }
             }
         }
