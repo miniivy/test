@@ -29,7 +29,8 @@ podTemplate(label: 'mypod', containers: [
             container('maven') {
                 dir('hello-world-war/') {
                     sh 'hostname'
-                    sh 'hostname -i'            
+                    sh 'hostname -i'
+                    
                 }
             }
         }
