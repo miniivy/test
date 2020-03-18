@@ -1,41 +1,65 @@
-podTemplate(
-    label: 'mypod',
-    volumes: [
-        emptyDirVolume(mountPath: '/etc/gitrepo', memory: false),
-        hostPathVolume(mountPath: '/var/run/docker.sock', hostPath: '/var/run/docker.sock')
-    ],
-    containers:
-    [
-        containerTemplate(name: 'git', image: 'alpine/git', ttyEnabled: true, command: 'cat'),
-        containerTemplate(name: 'python', image: 'python:3.7.2', command: 'cat', ttyEnabled: true),
-        containerTemplate(name: 'docker', image: 'docker', command: 'cat', ttyEnabled: true,
-            envVars: [secretEnvVar(key: 'DOCKER_HUB_PASSWORD', secretName: 'docker-hub-password', secretKey: 'DOCKER_HUB_PASSWORD')]
-        )
-    ]
-)
-{
-    node('mypod') {
-        stage('Clone repository') {
-            container('git') {
-                sh 'git clone -b master https://github.com/miniivy/kubernetes-python-sdk-example.git /etc/gitrepo'
-            }
-        }
-        stage('Test source codes') {
-            container('python') {
-                sh 'pip install -r /etc/gitrepo/requirements.txt'
-                sh 'python /etc/gitrepo/main.py /etc/gitrepo/unit_test'
-                
-
-                junit 'unit_test/jenkins_output/*.xml'
-            }
-        }
-        stage('Build and push docker image'){
-            container('docker') {
-                sh 'docker login -ualicek106 -p$DOCKER_HUB_PASSWORD'
-                sh 'docker build /etc/gitrepo/ -t alicek106/kubernetes-python-sdk-example --no-cache'
-                sh 'docker push alicek106/kubernetes-python-sdk-example'
-            }
-        }
-    }
-
+pipeline {
+   agent any
+   environment {
+       registry = "magalixcorp/k8scicd"
+       GOCACHE = "/tmp"
+   }
+   stages {
+       stage('Build') {
+           agent {
+               docker {
+                   image 'golang'
+               }
+           }
+           steps {
+               // Create our project directory.
+               sh 'cd ${GOPATH}/src'
+               sh 'mkdir -p ${GOPATH}/src/hello-world'
+               // Copy all files in our Jenkins workspace to our project directory.
+               sh 'cp -r ${WORKSPACE}/* ${GOPATH}/src/hello-world'
+               // Build the app.
+               sh 'go build'
+           }
+       }
+       stage('Test') {
+           agent {
+               docker {
+                   image 'golang'
+               }
+           }
+           steps {
+               // Create our project directory.
+               sh 'cd ${GOPATH}/src'
+               sh 'mkdir -p ${GOPATH}/src/hello-world'
+               // Copy all files in our Jenkins workspace to our project directory.
+               sh 'cp -r ${WORKSPACE}/* ${GOPATH}/src/hello-world'
+               // Remove cached test results.
+               sh 'go clean -cache'
+               // Run Unit Tests.
+               sh 'go test ./... -v -short'
+           }
+       }
+       stage('Publish') {
+           environment {
+               registryCredential = 'dockerhub'
+           }
+           steps{
+               script {
+                   def appimage = docker.build registry + ":$BUILD_NUMBER"
+                   docker.withRegistry( '', registryCredential ) {
+                       appimage.push()
+                       appimage.push('latest')
+                   }
+               }
+           }
+       }
+       stage ('Deploy') {
+           steps {
+               script{
+                   def image_id = registry + ":$BUILD_NUMBER"
+                   sh "ansible-playbook  playbook.yml --extra-vars \"image_id=${image_id}\""
+               }
+           }
+       }
+   }
 }
