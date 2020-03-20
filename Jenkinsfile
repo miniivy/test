@@ -1,66 +1,30 @@
-pipeline {
-  agent any
-  stages {
-    stage('Build') {
-      agent {
-        docker {
-          image 'golang'
+podTemplate(containers: [
+    containerTemplate(name: 'maven', image: 'maven:3.3.9-jdk-8-alpine', ttyEnabled: true, command: 'cat'),
+    containerTemplate(name: 'golang', image: 'golang:1.8.0', ttyEnabled: true, command: 'cat')
+  ]) {
+
+    node(POD_LABEL) {
+        stage('Get a Maven project') {
+            git 'https://github.com/jenkinsci/kubernetes-plugin.git'
+            container('maven') {
+                stage('Build a Maven project') {
+                    sh 'mvn -B clean install'
+                }
+            }
         }
 
-      }
-      steps {
-        sh 'cd ${GOPATH}/src'
-        sh 'mkdir -p ${GOPATH}/src/hello-world'
-        sh 'cp -r ${WORKSPACE}/* ${GOPATH}/src/hello-world'
-        sh 'go build'
-      }
-    }
-
-    stage('Test') {
-      agent {
-        docker {
-          image 'golang'
+        stage('Get a Golang project') {
+            git url: 'https://github.com/hashicorp/terraform.git'
+            container('golang') {
+                stage('Build a Go project') {
+                    sh """
+                    mkdir -p /go/src/github.com/hashicorp
+                    ln -s `pwd` /go/src/github.com/hashicorp/terraform
+                    cd /go/src/github.com/hashicorp/terraform && make core-dev
+                    """
+                }
+            }
         }
 
-      }
-      steps {
-        sh 'cd ${GOPATH}/src'
-        sh 'mkdir -p ${GOPATH}/src/hello-world'
-        sh 'cp -r ${WORKSPACE}/* ${GOPATH}/src/hello-world'
-        sh 'go clean -cache'
-        sh 'go test ./... -v -short'
-      }
     }
-
-    stage('Publish') {
-      environment {
-        registryCredential = 'dockerhub'
-      }
-      steps {
-        script {
-          def appimage = docker.build registry + ":$BUILD_NUMBER"
-          docker.withRegistry( '', registryCredential ) {
-            appimage.push()
-            appimage.push('latest')
-          }
-        }
-
-      }
-    }
-
-    stage('Deploy') {
-      steps {
-        script {
-          def image_id = registry + ":$BUILD_NUMBER"
-          sh "ansible-playbook  playbook.yml --extra-vars \"image_id=${image_id}\""
-        }
-
-      }
-    }
-
-  }
-  environment {
-    registry = 'magalixcorp/k8scicd'
-    GOCACHE = '/tmp'
-  }
 }
