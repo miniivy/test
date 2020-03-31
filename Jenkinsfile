@@ -4,7 +4,8 @@ pipeline {
     stage('Build') {
       steps {
         echo 'Building..'
-        sh 'ls'     
+        sh 'ls'
+        sh 'ls'
       }
     }
 
@@ -13,7 +14,7 @@ pipeline {
         echo 'Testing..'
       }
     }
-    
+
     stage('Deploy') {
       steps {
         echo 'Deploying....'
@@ -22,4 +23,3 @@ pipeline {
 
   }
 }
-
