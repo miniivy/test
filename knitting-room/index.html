@@ -99,6 +99,47 @@ h1 { font-family: var(--font-display); font-weight: 400; font-size: 1.35rem; mar
   h1 { font-size: 1.15rem; }
 }
 .hud .top, .hud .bottom { transition: opacity 1.6s ease; }
+.topright { display: grid; gap: 8px; justify-items: end; }
+.btnrow { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.minichart { display: grid; gap: 6px; width: 220px; padding: 10px 12px; color: var(--wool); font: inherit; text-align: left; cursor: pointer; }
+.mc-head { display: flex; justify-content: space-between; gap: 8px; font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.mc-head b { font-family: var(--font-display); font-weight: 400; color: var(--wool); font-size: 0.92rem; }
+#mcCanvas { width: 100%; height: auto; border-radius: 6px; image-rendering: pixelated; }
+.mc-bar { height: 4px; border-radius: 4px; background: rgba(243,230,211,0.12); overflow: hidden; }
+.mc-bar i { display: block; height: 100%; width: 0; background: var(--ember); }
+.sheet { position: fixed; z-index: 5; left: 50%; transform: translateX(-50%);
+  top: calc(16px + env(safe-area-inset-top, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  width: min(760px, calc(100% - 32px)); overflow: auto; display: grid; align-content: start; gap: 14px; padding: 16px 18px; background: rgba(28,21,27,0.94); }
+.sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.sheet h2 { font-family: var(--font-display); font-weight: 400; color: var(--ember); margin: 0; font-size: 1.3rem; }
+.sheet h3 { font-family: var(--font-display); font-weight: 400; margin: 0; font-size: 1.1rem; }
+.patgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+.patcard { font: inherit; color: var(--wool); background: rgba(0,0,0,0.22); border: 1px solid var(--felt-line); border-radius: 12px; padding: 8px; display: grid; gap: 6px; cursor: pointer; text-align: left; }
+.patcard[aria-pressed="true"] { border-color: var(--ember); box-shadow: 0 0 0 1px var(--ember) inset; }
+.patcard canvas { width: 100%; height: auto; border-radius: 6px; image-rendering: pixelated; }
+.patcard span { font-size: 0.8rem; }
+.patcard small { color: var(--muted); font-size: 0.7rem; }
+.patdetail { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.chartwrap { overflow-x: auto; background: rgba(0,0,0,0.25); border-radius: 10px; padding: 8px; }
+#bigChart { display: block; max-width: 100%; height: auto; image-rendering: pixelated; }
+.patinfo { display: grid; gap: 10px; min-width: 0; }
+.pdmeta { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; font-size: 0.85rem; }
+.pdmeta dt { color: var(--muted); } .pdmeta dd { margin: 0; }
+.colorpick { display: grid; gap: 6px; }
+.colorpick .cprow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 0.8rem; color: var(--muted); }
+.colorpick .cprow > span { width: 52px; }
+.colorpick .swatch { width: 24px; height: 24px; }
+.decobody { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: 18px; align-items: start; }
+.preview { background: rgba(0,0,0,0.25); border-radius: 10px; padding: 12px; display: grid; place-items: center; }
+#decoPreview { max-width: 100%; height: auto; image-rendering: pixelated; }
+.decoopts { display: grid; gap: 10px; align-content: start; }
+.toggle { display: flex; gap: 8px; align-items: center; font-size: 0.92rem; cursor: pointer; }
+.toggle input { width: 18px; height: 18px; accent-color: var(--ember); }
+.galtitle { margin-top: 4px !important; }
+.gallery { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+.gallery figure { margin: 0; display: grid; gap: 4px; justify-items: center; font-size: 0.72rem; color: var(--muted); flex: none; }
+.gallery canvas { height: 120px; width: auto; border-radius: 6px; image-rendering: pixelated; }
+@media (max-width: 640px) { .patdetail, .decobody { grid-template-columns: 1fr; } .minichart { width: 170px; } .btnrow .iconbtn { padding: 8px 10px; font-size: 0.85rem; } }
 body.idle .hud .top, body.idle .hud .bottom { opacity: 0; }
 body.idle { cursor: none; }
 .calm {
@@ -124,7 +165,18 @@ body.idle .calm { bottom: calc(40px + env(safe-area-inset-bottom, 0px)); }
       <div class="sub"><span><span class="dot off" id="netDot"></span><span id="people">혼자 뜨는 중</span></span></div>
       <div id="catLine">고양이가 둥글게 말려 자고 있어요</div>
     </div>
-    <button class="iconbtn" id="setBtn" aria-expanded="false" aria-controls="panel">내 자리 꾸미기</button>
+    <div class="topright">
+      <div class="btnrow">
+        <button class="iconbtn" id="patBtn" aria-expanded="false" aria-controls="patPanel">도안</button>
+        <button class="iconbtn" id="decoBtn" aria-expanded="false" aria-controls="decoPanel">꾸미기</button>
+        <button class="iconbtn" id="setBtn" aria-expanded="false" aria-controls="panel">내 자리</button>
+      </div>
+      <button class="minichart tag" id="miniChart" aria-label="지금 뜨는 도안 보기">
+        <span class="mc-head"><b id="mcName">하트 한 송이</b><span id="mcPos">1단 1코째</span></span>
+        <canvas id="mcCanvas" width="200" height="70"></canvas>
+        <span class="mc-bar"><i id="mcBar"></i></span>
+      </button>
+    </div>
   </div>
   <div></div>
   <div class="bottom">
@@ -162,6 +214,41 @@ body.idle .calm { bottom: calc(40px + env(safe-area-inset-bottom, 0px)); }
   <p class="hint" style="margin:0">손 모델: WebXR Input Profiles generic-hand, © 2019 Amazon, MIT 라이선스</p>
 </div>
 
+<div class="sheet tag" id="patPanel" hidden>
+  <div class="sheet-head"><h2>도안 고르기</h2><button class="iconbtn" data-close="patPanel">닫기</button></div>
+  <div class="patgrid" id="patGrid"></div>
+  <div class="patdetail">
+    <div class="chartwrap"><canvas id="bigChart"></canvas></div>
+    <div class="patinfo">
+      <h3 id="pdName"></h3>
+      <p class="hint" id="pdNote"></p>
+      <dl class="pdmeta"><dt>크기</dt><dd id="pdSize"></dd><dt>난이도</dt><dd id="pdLevel"></dd><dt>예상 길이</dt><dd id="pdLen"></dd></dl>
+      <div class="colorpick" id="colorPick"></div>
+      <p class="hint" id="pdWarn"></p>
+      <button class="knit" id="pdStart">이 도안으로 시작</button>
+    </div>
+  </div>
+  <p class="hint" style="margin:0">도안은 아래에서 위로, 오른쪽에서 왼쪽으로 읽어요. 진한 칸은 이미 뜬 코, 테두리 칸이 지금 뜨는 코예요.</p>
+</div>
+
+<div class="sheet tag" id="decoPanel" hidden>
+  <div class="sheet-head"><h2>꾸미기</h2><button class="iconbtn" data-close="decoPanel">닫기</button></div>
+  <div class="decobody">
+    <div class="preview"><canvas id="decoPreview"></canvas></div>
+    <div class="decoopts">
+      <p class="hint" id="decoState"></p>
+      <label class="toggle"><input type="checkbox" id="dFringe"> 양끝에 술 달기</label>
+      <div class="colorpick small" id="fringeCols"></div>
+      <label class="toggle"><input type="checkbox" id="dPom"> 모서리에 방울(폼폼) 달기</label>
+      <label class="toggle"><input type="checkbox" id="dButton"> 가운데 나무 단추</label>
+      <button class="pet" id="catScarfBtn">고양이에게 둘러주기</button>
+      <button class="pet" id="newProjBtn">완성품 보관하고 새 도안 시작</button>
+    </div>
+  </div>
+  <h3 class="galtitle">내 작품함</h3>
+  <div class="gallery" id="gallery"><p class="hint">완성한 작품이 여기에 모여요.</p></div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
@@ -194,6 +281,61 @@ const me = {
   seat: 0, petN: 0, sayN: 0, say: ''
 };
 const GAUGE = 20, ROW_CM = 0.6;
+// ---------- knitting charts (도안): 20 stitches wide, row 0 is the first row knitted ----------
+// '.' main colour, 'x' contrast, 'o' accent. Written top-down like a printed chart, then flipped.
+function padChart(lines, H) {
+  const top = Math.floor((H - lines.length) / 2), out = [];
+  for (let i = 0; i < H; i++) { const l = lines[i - top]; out.push(l ? (l + '.'.repeat(20)).slice(0, 20) : '.'.repeat(20)); }
+  return out;
+}
+const gen = (H, f) => { const rows = []; for (let r = H - 1; r >= 0; r--) { let l = ''; for (let c = 0; c < 20; c++) l += f(r, c); rows.push(l); } return rows; };
+const PATTERNS = [
+  { id: 'plain', name: '메리야스 무지', level: '입문', note: '겉뜨기만 반복해요. 손에 리듬을 익히기 좋아요.', colors: ['#efe6d8', '#a68bd1', '#e7a4c0'],
+    chart: gen(20, () => '.') },
+  { id: 'stripe', name: '포근 줄무늬', level: '쉬움', note: '4단마다 실을 바꿔요. 바뀐 색이 한 단씩 쌓여요.', colors: ['#6f9fd8', '#efe6d8', '#f2a35a'],
+    chart: gen(24, r => (r % 8 < 4 ? '.' : r % 8 === 5 ? 'o' : 'x')) },
+  { id: 'check', name: '깅엄 체크', level: '보통', note: '4코 4단 블록이 겹쳐 진한 칸이 생겨요.', colors: ['#efe6d8', '#e7a4c0', '#d9534f'],
+    chart: gen(24, (r, c) => { const a = Math.floor(r / 4) % 2, b = Math.floor(c / 4) % 2; return a && b ? 'o' : a || b ? 'x' : '.'; }) },
+  { id: 'heart', name: '하트 한 송이', level: '보통', note: '가운데 하트 모티프, 위아래 테두리 무늬.', colors: ['#efe6d8', '#d9534f', '#e7a4c0'],
+    chart: padChart([
+      'o.o.o.o.o.o.o.o.o.o.', 'oooooooooooooooooooo', '', '',
+      '....xxxx....xxxx....', '...xxoxxx..xxxxxx...', '..xxoxxxxxxxxxxxxx..', '..xxxxxxxxxxxxxxxx..', '..xxxxxxxxxxxxxxxx..',
+      '...xxxxxxxxxxxxxx...', '....xxxxxxxxxxxx....', '.....xxxxxxxxxx.....', '......xxxxxxxx......', '.......xxxxxx.......',
+      '........xxxx........', '.........xx.........', '', '', 'oooooooooooooooooooo', '.o.o.o.o.o.o.o.o.o.o'
+    ], 26) },
+  { id: 'cat', name: '고양이 얼굴', level: '어려움', note: '귀, 눈, 코를 세 가지 색으로 떠요.', colors: ['#f3e6d3', '#e39a4f', '#3f4f6b'],
+    chart: padChart([
+      '...x............x...', '...xx..........xx...', '...xxx........xxx...', '...xxxx......xxxx...', '...xxxxxxxxxxxxxx...',
+      '..xxxxxxxxxxxxxxxx..', '..xxxxxxxxxxxxxxxx..', '..xxxooxxxxxxooxxx..', '..xxxooxxxxxxooxxx..', '..xxxxxxxxxxxxxxxx..',
+      '..xxxxxxxooxxxxxxx..', '..xxxxxxxxxxxxxxxx..', '...xxxxxxxxxxxxxx...', '....xxxxxxxxxxxx....', '.....xxxxxxxxxx.....'
+    ], 24) },
+  { id: 'snow', name: '노르딕 눈꽃', level: '어려움', note: '눈꽃 결정과 페리 테두리. 겨울밤에 어울려요.', colors: ['#3f4f6b', '#efe6d8', '#d9534f'],
+    chart: gen(26, (r, c) => {
+      if (r === 0 || r === 25) return 'o';
+      if (r === 1 || r === 24) return c % 4 === 1 ? 'x' : '.';
+      if (r === 2 || r === 23) return (c % 4 === 0 || c % 4 === 2) ? 'x' : '.';
+      const dx = c - 9.5, dy = r - 12.5, ax = Math.abs(dx), ay = Math.abs(dy);
+      if (Math.hypot(dx, dy) > 8.2) return '.';
+      if (ax < 0.6 || ay < 0.6 || Math.abs(ax - ay) < 0.6) return 'x';
+      if ((Math.abs(ax - 5.5) < 0.6 && ay < 2.6 && ay > 0.6) || (Math.abs(ay - 5.5) < 0.6 && ax < 2.6 && ax > 0.6)) return 'x';
+      return '.';
+    }) }
+];
+PATTERNS.forEach(pt => { pt.rows = pt.chart.slice().reverse(); pt.H = pt.rows.length; });   // rows[0] = first row knitted
+const CI = { '.': 0, x: 1, o: 2 };
+const patById = id => PATTERNS.find(p => p.id === id) || PATTERNS[0];
+const proj = Object.assign({ pid: 'heart', colors: null, st: 0, deco: { fringe: false, pom: false, button: false, fc: 1 }, done: false }, store.get('proj', {}));
+if (!proj.colors) proj.colors = patById(proj.pid).colors.slice();
+let gallery = store.get('gallery', []);
+const saveProj = () => store.set('proj', proj);
+const projPat = () => patById(proj.pid);
+const projTotal = () => projPat().H * GAUGE;
+// colour of a stitch (row r, chart column c, counted from the left as the chart is printed)
+function stitchColor(r, c, pat = projPat(), cols = proj.colors) {
+  if (r < 0) return cols[0];
+  if (r >= pat.H) r = pat.H - 1;
+  return cols[CI[pat.rows[r][c]] || 0];
+}
 
 // ---------- three setup ----------
 const canvas = document.getElementById('scene');
@@ -465,7 +607,7 @@ function makeScarf(color, width) {
 }
 function setScarf(mesh, st) {
   const L = scarfLen(st); mesh.scale.y = L; mesh.position.y = -L / 2;
-  mesh.userData.tex.repeat.set(1.5, Math.max(1, L / 0.05));
+  if (!mesh.userData.tex.isChartTex) mesh.userData.tex.repeat.set(1.5, Math.max(1, L / 0.05));
 }
 
 // ---------- my hands (attached to camera) ----------
@@ -655,18 +797,82 @@ if (THREE.GLTFLoader) {
 
 // ---------- the knitted fabric, hanging from the live stitches on both needles ----------
 const FAB_ROWS = 20, ROW_H = 0.0105;
-const fabricTexture = () => { const t = knitTexture(me.color); t.repeat.set(GAUGE / 8, 1); return t; };
-const fabricMat = std('#ffffff', 1, { side: THREE.DoubleSide });
-function refreshFabricMat() { fabricMat.map = fabricTexture(); fabricMat.bumpMap = fabricMat.map; fabricMat.bumpScale = 0.04; fabricMat.needsUpdate = true; }
-refreshFabricMat();
+const CELL = 16;
+const fabCanvas = document.createElement('canvas'); fabCanvas.width = GAUGE * CELL; fabCanvas.height = (FAB_ROWS + 1) * CELL;
+const fabTex = new THREE.CanvasTexture(fabCanvas); fabTex.encoding = THREE.sRGBEncoding; fabTex.anisotropy = 4;
+const fabricMat = std('#ffffff', 1, { side: THREE.DoubleSide, map: fabTex, bumpMap: fabTex, bumpScale: 0.04 });
+function refreshFabricMat() { fabKey = ''; }
+// one knit "V" per stitch, in that stitch's yarn colour
+function drawStitch(g, x, y, w, h, color) {
+  const c = new THREE.Color(color);
+  g.fillStyle = '#' + c.clone().multiplyScalar(0.55).getHexString(); g.fillRect(x, y, w, h);
+  g.fillStyle = color;
+  g.beginPath(); g.ellipse(x + w * 0.3, y + h * 0.5, w * 0.24, h * 0.56, -0.5, 0, 6.283); g.fill();
+  g.beginPath(); g.ellipse(x + w * 0.7, y + h * 0.5, w * 0.24, h * 0.56, 0.5, 0, 6.283); g.fill();
+  g.fillStyle = '#' + c.clone().lerp(new THREE.Color('#ffffff'), 0.22).getHexString();
+  g.beginPath(); g.ellipse(x + w * 0.27, y + h * 0.36, w * 0.07, h * 0.2, -0.5, 0, 6.283); g.fill();
+  g.beginPath(); g.ellipse(x + w * 0.73, y + h * 0.36, w * 0.07, h * 0.2, 0.5, 0, 6.283); g.fill();
+}
+let fabKey = '';
+// fabric row 0 = the stitches on the needles; the knitted part of the current row is on the right
+function drawFabric(nR, shown) {
+  const R = Math.floor(proj.st / GAUGE), key = proj.pid + proj.colors.join() + proj.st + '|' + nR + '|' + shown;
+  if (key === fabKey) return; fabKey = key;
+  const g = fabCanvas.getContext('2d');
+  for (let r = 0; r <= FAB_ROWS; r++) for (let c = 0; c < GAUGE; c++) {
+    const onNew = c >= GAUGE - nR;
+    const chartRow = r > shown ? -1 : (onNew ? R - r : R - 1 - r);
+    drawStitch(g, c * CELL, r * CELL, CELL, CELL, stitchColor(chartRow, c));
+  }
+  fabTex.needsUpdate = true;
+}
+// a finished piece (or one in progress) as a flat knitted picture
+function chartCanvas(pat, cols, rowsDone, cell = 8, deco) {
+  const c = document.createElement('canvas'); const fr = deco && deco.fringe ? cell * 3 : 0;
+  c.width = GAUGE * cell; c.height = pat.H * cell + fr * 2;
+  const g = c.getContext('2d');
+  for (let r = 0; r < pat.H; r++) for (let k = 0; k < GAUGE; k++) {
+    const y = fr + (pat.H - 1 - r) * cell;
+    if (r < rowsDone) drawStitch(g, k * cell, y, cell, cell, stitchColor(r, k, pat, cols));
+    else { g.fillStyle = 'rgba(255,255,255,0.06)'; g.fillRect(k * cell, y, cell - 1, cell - 1); }
+  }
+  if (deco && deco.fringe) {
+    g.strokeStyle = cols[deco.fc || 1]; g.lineWidth = Math.max(1, cell * 0.25);
+    for (let k = 0; k < GAUGE; k += 2) { [0, c.height - fr].forEach(y0 => { g.beginPath(); g.moveTo(k * cell + cell, y0 + (y0 ? 0 : fr)); g.lineTo(k * cell + cell + (Math.random() - 0.5) * cell * 0.6, y0 ? c.height : 0); g.stroke(); }); }
+  }
+  if (deco && deco.pom) { g.fillStyle = cols[2]; [[cell, fr], [c.width - cell, fr], [cell, c.height - fr], [c.width - cell, c.height - fr]].forEach(([x, y]) => { g.beginPath(); g.arc(x, y, cell * 1.1, 0, 6.283); g.fill(); }); }
+  if (deco && deco.button) { g.fillStyle = '#8a5a3a'; g.beginPath(); g.arc(c.width / 2, fr + pat.H * cell * 0.5, cell * 0.9, 0, 6.283); g.fill(); g.fillStyle = '#3a2418'; [-1, 1].forEach(d => { g.beginPath(); g.arc(c.width / 2 + d * cell * 0.3, fr + pat.H * cell * 0.5, cell * 0.15, 0, 6.283); g.fill(); }); }
+  return c;
+}
 const fabricGeo = new THREE.PlaneGeometry(1, 1, GAUGE - 1, FAB_ROWS);
 const fabric = new THREE.Mesh(fabricGeo, fabricMat); fabric.castShadow = true; fabric.frustumCulled = false; hands.add(fabric);
 const _g = new THREE.Vector3(), _q = new THREE.Quaternion(), _top = [];
 for (let i = 0; i < GAUGE; i++) _top.push(new THREE.Vector3());
+let fabNR = 0, fabBottom = 2;
+const decoGroup = new THREE.Group(); hands.add(decoGroup);
+const fringeMat = std('#ffffff', 1), pomMat = std('#ffffff', 1, { map: knitTexture('#ffffff') }), btnMat = std('#8a5a3a', 0.45);
+const fringes = [];
+for (let i = 0; i < 10; i++) { const f = new THREE.Mesh(new THREE.CylinderGeometry(0.0016, 0.0012, 0.04, 5), fringeMat); f.castShadow = true; decoGroup.add(f); fringes.push(f); }
+const poms = [0, 1].map(() => { const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.013, 2), pomMat); decoGroup.add(m); return m; });
+const btn = new THREE.Mesh(new THREE.CylinderGeometry(0.0075, 0.0075, 0.003, 18), btnMat); decoGroup.add(btn);
+const _v = new THREE.Vector3(), _n = new THREE.Vector3(), _yAxis = new THREE.Vector3(0, 1, 0);
+function updateDeco() {
+  const d = proj.deco, pos = fabricGeo.attributes.position, nor = fabricGeo.attributes.normal, br = fabBottom;
+  setCol(fringeMat, proj.colors[d.fc || 1]); setCol(pomMat, proj.colors[2]);
+  fringes.forEach((f, i) => {
+    f.visible = !!d.fringe; if (!f.visible) return;
+    const c = Math.round(1 + i * (GAUGE - 3) / 9);
+    _v.fromBufferAttribute(pos, br * GAUGE + c);
+    f.quaternion.setFromUnitVectors(_yAxis, _g.clone().negate()); f.position.copy(_v).addScaledVector(_g, 0.02);
+  });
+  poms.forEach((m, i) => { m.visible = !!d.pom; if (!m.visible) return; _v.fromBufferAttribute(pos, br * GAUGE + (i ? GAUGE - 1 : 0)); m.position.copy(_v).addScaledVector(_g, 0.012); });
+  btn.visible = !!d.button;
+  if (btn.visible) { const idx = Math.floor(br / 2) * GAUGE + 10; _v.fromBufferAttribute(pos, idx); _n.fromBufferAttribute(nor, idx); if (_n.z < 0) _n.negate(); btn.position.copy(_v).addScaledVector(_n, 0.003); btn.quaternion.setFromUnitVectors(_yAxis, _n); }
+}
 function updateFabric(t, rowsDone) {
   hands.getWorldQuaternion(_q); _g.set(0, -1, 0).applyQuaternion(_q.invert());
   _g.z += 0.35; _g.normalize();
-  const shown = Math.min(FAB_ROWS, rowsDone + 9);
+  const shown = Math.min(FAB_ROWS, Math.max(2, rowsDone + 1)); drawFabric(fabNR, shown);
   const pos = fabricGeo.attributes.position;
   for (let r = 0; r <= FAB_ROWS; r++) {
     const dr = Math.min(r, shown) * ROW_H, fold = Math.max(0, r - shown);
@@ -682,8 +888,7 @@ function updateFabric(t, rowsDone) {
     }
   }
   pos.needsUpdate = true; fabricGeo.computeVertexNormals();
-  fabricMat.map.repeat.set(GAUGE / 8, Math.max(0.15, shown / 8));
-  fabricMat.map.offset.y = -shown / 8;
+  fabBottom = shown;
 }
 
 // ---------- knitting motion: needles are driven by where their tips must go ----------
@@ -723,17 +928,18 @@ function newStitchFeel() { stitchDur = 0.88 + Math.random() * 0.26; stitchAmp = 
 newStitchFeel();
 const myScarfHolder = new THREE.Group(); myScarfHolder.position.set(-0.05, 0.02, -0.02); hands.add(myScarfHolder);
 let myScarf = makeScarf(me.color, 0.2); myScarfHolder.add(myScarf); setScarf(myScarf, me.st); myScarfHolder.visible = false;
-const myYarnBall = new THREE.Mesh(new THREE.SphereGeometry(0.06, 14, 10), std(me.color, 1, { map: knitTexture(me.color) })); myYarnBall.position.set(0.32, -0.28, 0.05); hands.add(myYarnBall);
+const myYarnBall = new THREE.Mesh(new THREE.SphereGeometry(0.06, 14, 10), std('#ffffff', 1, { map: knitTexture('#ffffff') })); myYarnBall.position.set(0.32, -0.28, 0.05); hands.add(myYarnBall);
 // live stitches sitting on each needle (they hop from left to right one by one)
 const loopMat = std(me.color, 0.9);
 const loopGeo = new THREE.TorusGeometry(0.0115, 0.0034, 8, 18);
 function mkLoops(needle) {
   const arr = [];
-  for (let i = 0; i < GAUGE; i++) { const l = new THREE.Mesh(loopGeo, loopMat); l.rotation.set(Math.PI / 2 + (Math.random() - 0.5) * 0.25, (Math.random() - 0.5) * 0.3, (Math.random() - 0.5) * 0.4); l.scale.set(1, 1, 0.85 + Math.random() * 0.3); l.castShadow = true; needle.add(l); arr.push(l); }
+  for (let i = 0; i < GAUGE; i++) { const l = new THREE.Mesh(loopGeo, loopMat.clone()); l.rotation.set(Math.PI / 2 + (Math.random() - 0.5) * 0.25, (Math.random() - 0.5) * 0.3, (Math.random() - 0.5) * 0.4); l.scale.set(1, 1, 0.85 + Math.random() * 0.3); l.castShadow = true; needle.add(l); arr.push(l); }
   return arr;
 }
 const loopsL = mkLoops(needleL), loopsR = mkLoops(needleR);
-const hopLoop = new THREE.Mesh(loopGeo, loopMat); hands.add(hopLoop);
+const hopLoop = new THREE.Mesh(loopGeo, loopMat.clone()); hands.add(hopLoop);
+const setCol = (mat, hex) => { if (mat.userData.hex !== hex) { mat.userData.hex = hex; mat.color.set(hex); } };
 // working yarn from the ball, over the right hand, to the needle tip
 const yarnMat = std(me.color, 0.9);
 let yarnMesh = null;
@@ -753,9 +959,8 @@ function updateYarn(t) {
 }
 
 function refreshMyColor() {
-  loopMat.color.set(me.color); yarnMat.color.set(me.color); refreshFabricMat();
+
   sleeveMat.color.set('#ffffff'); sleeveMat.map = knitTexture(me.color); sleeveMat.map.repeat.set(2, 1); sleeveMat.bumpMap = sleeveMat.map; sleeveMat.needsUpdate = true;
-  myYarnBall.material.map = knitTexture(me.color); myYarnBall.material.needsUpdate = true;
   myScarfHolder.remove(myScarf); myScarf = makeScarf(me.color, 0.2); myScarfHolder.add(myScarf); setScarf(myScarf, me.st);
 }
 sleeveMat.color.set('#ffffff');
@@ -881,7 +1086,7 @@ const petCounts = new Map();
 function myDisplayName() { return me.nick || '나'; }
 function pushPresence() {
   if (!room) return;
-  room.presence({ seat: me.seat, color: me.color, nick: (me.nick || '').slice(0, 12), st: me.st, petN: me.petN, say: me.say, sayN: me.sayN, k: !!me.knitting, sp: me.sp }).catch(() => {});
+  room.presence({ seat: me.seat, color: me.color, nick: (me.nick || '').slice(0, 12), st: me.st, petN: me.petN, say: me.say, sayN: me.sayN, k: !!me.knitting, sp: me.sp, pt: proj.pid, pc: proj.colors, pr: Math.floor(proj.st / GAUGE) }).catch(() => {});
 }
 let presTimer = 0;
 function queuePresence() { if (presTimer) return; presTimer = setTimeout(() => { presTimer = 0; pushPresence(); }, 120); }
@@ -941,6 +1146,16 @@ function syncAvatars(now) {
     a.k = pr.k !== false; a.sp = Number.isFinite(pr.sp) ? Math.min(4000, Math.max(800, pr.sp)) : 1700;
     const st = Number.isFinite(pr.st) ? Math.max(0, Math.floor(pr.st)) : 0;
     if (st !== a.st) { if (a.st >= 0 && st > a.st) { a.lastStChange = now; knitters.set(p.peer, now); } a.st = st; setScarf(a.scarf, st); }
+    // their scarf shows the chart they are knitting, as far as they have got
+    const pt = PATTERNS.find(x => x.id === pr.pt);
+    const pc = Array.isArray(pr.pc) && pr.pc.length === 3 && pr.pc.every(h => /^#[0-9a-fA-F]{6}$/.test(h)) ? pr.pc : null;
+    const prow = Number.isFinite(pr.pr) ? Math.max(0, Math.min(60, Math.floor(pr.pr))) : 0;
+    const pkey = pt && pc ? pt.id + pc.join() + prow + a.color : '';
+    if (pkey && pkey !== a.pkey) {
+      a.pkey = pkey;
+      const tex = new THREE.CanvasTexture(chartCanvas(pt, pc, Math.max(1, prow), 8)); tex.encoding = THREE.sRGBEncoding; tex.isChartTex = true;
+      a.scarf.userData.tex = tex; a.scarf.material.map = tex; a.scarf.material.bumpMap = tex; a.scarf.material.needsUpdate = true;
+    }
     if (p.by && !profileNames[p.by]) needNames.push(p.by);
     const nick = typeof pr.nick === 'string' ? pr.nick.slice(0, 12) : '';
     const name = nick || (p.by && profileNames[p.by]) || '뜨개 손님';
@@ -1057,6 +1272,7 @@ setInterval(() => { if (me.knitting) { calmI = (calmI + 1) % CALM.length; calm(C
 function completeStitch() {
   const now = performance.now();
   me.st += 1; knitters.set('me', now);
+  if (!proj.done) { proj.st += 1; saveProj(); renderMiniChart(); if (proj.st >= projTotal()) finishProject(); }
   setScarf(myScarf, me.st); clickSound();
   if (me.st % GAUGE === 0) {
     const rows = me.st / GAUGE;
@@ -1099,7 +1315,7 @@ window.addEventListener('keydown', e => {
 let idleT = 0;
 function wake() {
   document.body.classList.remove('idle'); clearTimeout(idleT);
-  idleT = setTimeout(() => { if (panel.hidden && document.activeElement && document.activeElement.tagName !== 'INPUT') document.body.classList.add('idle'); }, 7000);
+  idleT = setTimeout(() => { if (!document.querySelector('#panel:not([hidden]), .sheet:not([hidden])') && document.activeElement && document.activeElement.tagName !== 'INPUT') document.body.classList.add('idle'); }, 7000);
 }
 ['pointermove', 'pointerdown', 'keydown', 'touchstart'].forEach(ev => window.addEventListener(ev, wake, { passive: true }));
 function catPetted(peer, fromPos, name) {
@@ -1122,7 +1338,7 @@ document.getElementById('chatForm').addEventListener('submit', e => {
 
 // settings panel
 const panel = document.getElementById('panel'), setBtn = document.getElementById('setBtn');
-setBtn.addEventListener('click', () => { panel.hidden = !panel.hidden; setBtn.setAttribute('aria-expanded', String(!panel.hidden)); });
+setBtn.addEventListener('click', () => { patPanel.hidden = true; decoPanel.hidden = true; panel.hidden = !panel.hidden; setBtn.setAttribute('aria-expanded', String(!panel.hidden)); });
 const nickIn = document.getElementById('nickIn'); nickIn.value = me.nick;
 nickIn.addEventListener('input', () => { me.nick = nickIn.value.trim().slice(0, 12); store.set('nick', me.nick); queuePresence(); });
 const sw = document.getElementById('swatches');
@@ -1136,6 +1352,176 @@ wake();
 const hqBtn = document.getElementById('hqBtn');
 const showHq = () => { hqBtn.textContent = hq ? '높게 (빛 번짐·필름 색감)' : '가볍게'; };
 hqBtn.addEventListener('click', () => { hq = !hq; store.set('hq', hq); buildComposer(); showHq(); }); showHq();
+
+// ---------- 도안 (patterns) & 꾸미기 (decorating) ----------
+const $ = id => document.getElementById(id);
+const patPanel = $('patPanel'), decoPanel = $('decoPanel'), patBtn = $('patBtn'), decoBtn = $('decoBtn');
+const SLOT_NAMES = ['바탕실', '배색실 1', '배색실 2'];
+function showSheet(el) {
+  const open = el.hidden;
+  [patPanel, decoPanel, panel].forEach(x => { x.hidden = true; });
+  el.hidden = !open;
+  patBtn.setAttribute('aria-expanded', String(!patPanel.hidden)); decoBtn.setAttribute('aria-expanded', String(!decoPanel.hidden)); setBtn.setAttribute('aria-expanded', 'false');
+  if (!patPanel.hidden) { selPid = proj.pid; selCols = proj.colors.slice(); renderPatPanel(); }
+  if (!decoPanel.hidden) renderDeco();
+  wake();
+}
+patBtn.addEventListener('click', () => showSheet(patPanel));
+$('miniChart').addEventListener('click', () => showSheet(patPanel));
+decoBtn.addEventListener('click', () => showSheet(decoPanel));
+document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => showSheet($(b.dataset.close))));
+
+// a printed-style chart: numbered rows on the right, stitches numbered from the right, current stitch outlined
+function drawChart(cv, pat, cols, o) {
+  const cell = o.cell, nums = !!o.nums, mr = nums ? 24 : 0, mb = nums ? 16 : 0;
+  const rFrom = o.rFrom ?? 0, rTo = o.rTo ?? pat.H - 1, H = rTo - rFrom + 1;
+  cv.width = GAUGE * cell + mr; cv.height = H * cell + mb;
+  const g = cv.getContext('2d'); g.clearRect(0, 0, cv.width, cv.height);
+  const R = o.progress ? Math.floor(proj.st / GAUGE) : -1, n = o.progress ? proj.st % GAUGE : 0;
+  for (let r = rFrom; r <= rTo; r++) for (let c = 0; c < GAUGE; c++) {
+    const x = c * cell, y = (rTo - r) * cell;
+    if (r < 0 || r >= pat.H) { g.fillStyle = 'rgba(255,255,255,0.04)'; g.fillRect(x, y, cell, cell); continue; }
+    g.fillStyle = cols[CI[pat.rows[r][c]] || 0]; g.fillRect(x, y, cell, cell);
+    const done = !o.progress || proj.done || r < R || (r === R && c >= GAUGE - n);
+    if (!done) { g.fillStyle = 'rgba(23,18,26,0.55)'; g.fillRect(x, y, cell, cell); }
+    if (cell >= 6) { g.strokeStyle = 'rgba(0,0,0,0.28)'; g.lineWidth = 1; g.strokeRect(x + 0.5, y + 0.5, cell - 1, cell - 1); }
+  }
+  if (cell >= 6) { // heavier rule every 10 stitches / rows, as printed charts do
+    g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(10 * cell, 0); g.lineTo(10 * cell, H * cell); g.stroke();
+    for (let r = rFrom; r <= rTo; r++) if (r % 10 === 0 && r > 0) { const y = (rTo - r + 1) * cell; g.beginPath(); g.moveTo(0, y); g.lineTo(GAUGE * cell, y); g.stroke(); }
+  }
+  if (o.progress && !proj.done && R >= rFrom && R <= rTo) {
+    g.strokeStyle = 'rgba(243,230,211,0.9)'; g.lineWidth = 1; g.strokeRect(0.5, (rTo - R) * cell + 0.5, GAUGE * cell - 1, cell - 1);
+    g.strokeStyle = '#f2a35a'; g.lineWidth = 2.5; g.strokeRect((GAUGE - 1 - n) * cell + 1.5, (rTo - R) * cell + 1.5, cell - 3, cell - 3);
+  }
+  if (nums) {
+    g.fillStyle = '#b9a993'; g.font = `${Math.max(9, cell * 0.72)}px "Gowun Dodum", sans-serif`; g.textBaseline = 'middle';
+    for (let r = rFrom; r <= rTo; r++) if (r === 0 || (r + 1) % 5 === 0) g.fillText(String(r + 1), GAUGE * cell + 4, (rTo - r + 0.5) * cell);
+    g.textBaseline = 'top'; g.textAlign = 'center';
+    [20, 15, 10, 5, 1].forEach(k => g.fillText(String(k), (GAUGE - k + 0.5) * cell, H * cell + 3));
+    g.textAlign = 'left';
+  }
+}
+let selPid = proj.pid, selCols = proj.colors.slice();
+function renderPatPanel() {
+  const grid = $('patGrid'); grid.textContent = '';
+  PATTERNS.forEach(pt => {
+    const b = document.createElement('button'); b.className = 'patcard'; b.setAttribute('aria-pressed', String(pt.id === selPid));
+    const cv = document.createElement('canvas'); drawChart(cv, pt, pt.id === proj.pid ? proj.colors : pt.colors, { cell: 5 });
+    const nm = document.createElement('span'); nm.textContent = pt.name;
+    const lv = document.createElement('small'); lv.textContent = pt.level + (pt.id === proj.pid ? (proj.done ? ' · 완성' : ' · 뜨는 중') : '');
+    b.append(cv, nm, lv);
+    b.addEventListener('click', () => { selPid = pt.id; selCols = (pt.id === proj.pid ? proj.colors : pt.colors).slice(); renderPatPanel(); });
+    grid.appendChild(b);
+  });
+  const pt = patById(selPid), current = selPid === proj.pid && !proj.done;
+  drawChart($('bigChart'), pt, selCols, { cell: 13, nums: true, progress: current });
+  $('pdName').textContent = pt.name; $('pdNote').textContent = pt.note;
+  $('pdSize').textContent = `${GAUGE}코 × ${pt.H}단 (${GAUGE * pt.H}코)`; $('pdLevel').textContent = pt.level;
+  $('pdLen').textContent = `약 ${(pt.H * ROW_CM).toFixed(1)} cm, 느긋하게 ${Math.round(GAUGE * pt.H * 2.4 / 60)}분`;
+  const used = [0, 1, 2].filter(i => i === 0 || pt.chart.some(l => l.includes(i === 1 ? 'x' : 'o')));
+  const cp = $('colorPick'); cp.textContent = '';
+  used.forEach(i => {
+    const row = document.createElement('div'); row.className = 'cprow';
+    const lb = document.createElement('span'); lb.textContent = SLOT_NAMES[i]; row.appendChild(lb);
+    YARNS.concat([{ c: '#3f4f6b', n: '남색' }, { c: '#e39a4f', n: '귤' }]).forEach(y => {
+      const sw = document.createElement('button'); sw.className = 'swatch'; sw.style.background = y.c; sw.title = y.n;
+      sw.setAttribute('aria-label', `${SLOT_NAMES[i]} ${y.n}`); sw.setAttribute('aria-pressed', String(selCols[i] === y.c));
+      sw.addEventListener('click', () => { selCols[i] = y.c; renderPatPanel(); });
+      row.appendChild(sw);
+    });
+    cp.appendChild(row);
+  });
+  const startBtn = $('pdStart');
+  if (current) { startBtn.firstChild.textContent = '이 색으로 계속 뜨기'; $('pdWarn').textContent = `지금 ${Math.floor(proj.st / GAUGE) + 1}단 ${proj.st % GAUGE + 1}코째를 뜨고 있어요. 색을 바꾸면 이미 뜬 부분도 함께 바뀌어요.`; }
+  else { startBtn.firstChild.textContent = '이 도안으로 시작'; $('pdWarn').textContent = proj.st > 0 && !proj.done ? `뜨던 "${projPat().name}"(${Math.floor(proj.st / GAUGE)}단)은 작품함에 보관돼요.` : ''; }
+}
+$('pdStart').addEventListener('click', () => {
+  const current = selPid === proj.pid && !proj.done;
+  if (!current) {
+    if (proj.st >= GAUGE) archiveProject();
+    proj.pid = selPid; proj.st = 0; proj.done = false; proj.deco = { fringe: false, pom: false, button: false, fc: 1 };
+    calm(`새 도안 "${patById(selPid).name}". 1단 오른쪽 끝 코부터 천천히.`);
+  } else calm('실 색을 바꿨어요.');
+  proj.colors = selCols.slice(); saveProj(); fabKey = ''; renderMiniChart(); pushPresence();
+  showSheet(patPanel); if (!me.knitting) togglePause();
+});
+function renderMiniChart() {
+  const pt = projPat(), R = Math.floor(proj.st / GAUGE), n = proj.st % GAUGE;
+  $('mcName').textContent = pt.name;
+  $('mcPos').textContent = proj.done ? '완성!' : `${R + 1}단 ${n + 1}코째`;
+  const mid = proj.done ? pt.H - 4 : R;
+  drawChart($('mcCanvas'), pt, proj.colors, { cell: 10, progress: true, rFrom: mid - 3, rTo: mid + 3 });
+  $('mcBar').style.width = Math.min(100, proj.st / projTotal() * 100) + '%';
+}
+function archiveProject() {
+  gallery.unshift({ pid: proj.pid, colors: proj.colors.slice(), rows: Math.floor(proj.st / GAUGE), deco: Object.assign({}, proj.deco), done: proj.done });
+  gallery = gallery.slice(0, 12); store.set('gallery', gallery);
+}
+function finishProject() {
+  proj.done = true; saveProj();
+  if (me.knitting) togglePause();
+  toast(`"${projPat().name}" 완성! 꾸미기에서 술과 방울을 달아 보세요`);
+  floatText('완성', camBase.clone().lerp(new THREE.Vector3(0, 1.3, 0), 0.4), '#f2a35a', 3.2);
+  setTimeout(() => { if (decoPanel.hidden) showSheet(decoPanel); }, 1400);
+}
+function renderDeco() {
+  const pt = projPat(), rows = proj.done ? pt.H : Math.floor(proj.st / GAUGE);
+  const src = chartCanvas(pt, proj.colors, rows, 9, proj.deco), cv = $('decoPreview');
+  cv.width = src.width; cv.height = src.height; cv.getContext('2d').drawImage(src, 0, 0);
+  $('decoState').textContent = proj.done ? `"${pt.name}" 완성작이에요. 마음껏 꾸며 보세요.` : `"${pt.name}" ${rows}/${pt.H}단째예요. 미리 달아 봐도 괜찮아요.`;
+  $('dFringe').checked = !!proj.deco.fringe; $('dPom').checked = !!proj.deco.pom; $('dButton').checked = !!proj.deco.button;
+  const fc = $('fringeCols'); fc.textContent = '';
+  const row = document.createElement('div'); row.className = 'cprow'; const lb = document.createElement('span'); lb.textContent = '술 색'; row.appendChild(lb);
+  proj.colors.forEach((c, i) => { const sw = document.createElement('button'); sw.className = 'swatch'; sw.style.background = c; sw.setAttribute('aria-label', `술 색 ${SLOT_NAMES[i]}`); sw.setAttribute('aria-pressed', String((proj.deco.fc || 0) === i)); sw.addEventListener('click', () => { proj.deco.fc = i; saveProj(); renderDeco(); }); row.appendChild(sw); });
+  fc.appendChild(row); fc.hidden = !proj.deco.fringe;
+  $('newProjBtn').textContent = proj.done ? '작품함에 보관하고 새 도안 고르기' : '지금 상태로 보관하고 새 도안 고르기';
+  const gal = $('gallery'); gal.textContent = '';
+  if (!gallery.length) { const p0 = document.createElement('p'); p0.className = 'hint'; p0.textContent = '완성한 작품이 여기에 모여요.'; gal.appendChild(p0); }
+  gallery.forEach(it => {
+    const ip = patById(it.pid), f = document.createElement('figure');
+    const cv2 = chartCanvas(ip, it.colors, it.done ? ip.H : it.rows, 5, it.deco);
+    const cap = document.createElement('figcaption'); cap.textContent = ip.name + (it.done ? '' : ' (미완성)');
+    const b = document.createElement('button'); b.className = 'iconbtn'; b.textContent = '고양이에게'; b.style.fontSize = '0.75rem'; b.style.padding = '5px 8px';
+    b.addEventListener('click', () => setCatScarf({ pid: it.pid, colors: it.colors, rows: it.done ? ip.H : it.rows, deco: it.deco }, true));
+    f.append(cv2, cap, b); gal.appendChild(f);
+  });
+}
+['dFringe', 'dPom', 'dButton'].forEach(id => $(id).addEventListener('change', e => {
+  proj.deco[{ dFringe: 'fringe', dPom: 'pom', dButton: 'button' }[id]] = e.target.checked; saveProj(); renderDeco();
+}));
+$('catScarfBtn').addEventListener('click', () => setCatScarf({ pid: proj.pid, colors: proj.colors.slice(), rows: proj.done ? projPat().H : Math.floor(proj.st / GAUGE), deco: Object.assign({}, proj.deco) }, true));
+$('newProjBtn').addEventListener('click', () => {
+  if (proj.st >= GAUGE) archiveProject();
+  proj.st = 0; proj.done = false; proj.deco = { fringe: false, pom: false, button: false, fc: 1 }; saveProj(); fabKey = ''; renderMiniChart();
+  showSheet(patPanel);
+});
+
+// the cat can wear what you knitted
+let catScarf = null;
+function setCatScarf(item, announce) {
+  if (catScarf) { cat.remove(catScarf); catScarf = null; }
+  store.set('catScarf', item || null);
+  if (!item) return;
+  const pt = patById(item.pid);
+  const tex = new THREE.CanvasTexture(chartCanvas(pt, item.colors, Math.max(2, item.rows), 8)); tex.encoding = THREE.sRGBEncoding;
+  tex.center.set(0.5, 0.5); tex.rotation = Math.PI / 2; tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  const mat = std('#ffffff', 1, { map: tex, bumpMap: tex, bumpScale: 0.03, side: THREE.DoubleSide });
+  const g = new THREE.Group();
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.05, 14, 48), mat); ring.rotation.x = Math.PI / 2; ring.scale.set(1, 1.1, 0.75); ring.castShadow = true; g.add(ring);
+  const tex2 = new THREE.CanvasTexture(chartCanvas(pt, item.colors, Math.max(2, item.rows), 8, item.deco)); tex2.encoding = THREE.sRGBEncoding;
+  const tail = new THREE.Mesh(new THREE.PlaneGeometry(0.09, 0.26), std('#ffffff', 1, { map: tex2, side: THREE.DoubleSide })); tail.position.set(0.07, -0.1, 0.16); tail.rotation.set(0.15, 0.3, 0.12); tail.castShadow = true; g.add(tail);
+  catScarf = g; cat.add(g);
+  if (announce) { const p = cat.position.clone(); p.y += 0.9; floatText('♥', p, '#ff8aa0'); toast('고양이가 목도리를 둘렀어요'); purrUntil = performance.now() + 3000; }
+}
+function updateCatScarf() {
+  if (!catScarf) return;
+  catScarf.position.set(head.position.x * 0.7, head.position.y - 0.17, head.position.z - 0.1);
+  catScarf.rotation.set(head.rotation.x * 0.5 + 0.25, 0, head.rotation.z * 0.4);
+}
+setCatScarf(store.get('catScarf', null), false);
+renderMiniChart();
 
 // ---------- connect room ----------
 (async () => {
@@ -1187,7 +1573,7 @@ function frame() {
   // hands: insert front-to-back, throw the yarn, draw the loop through, slip the old stitch off
   const restK = me.knitting ? 1 : 0; handsRest = lerp(handsRest, restK, 0.035);
   if (turnT > 0) turnT = Math.max(0, turnT - dt / 1.8);
-  else if (me.knitting) { phase += dt * 1000 / (me.sp * stitchDur); if (phase >= 1) { phase -= 1; completeStitch(); newStitchFeel(); if (me.st % GAUGE === 0) turnT = 1; } }
+  else if (me.knitting) { phase += dt * 1000 / (me.sp * stitchDur); if (phase >= 1) { phase -= 1; completeStitch(); newStitchFeel(); if (proj.st % GAUGE === 0 && !proj.done) turnT = 1; } }
   const p = turnT > 0 ? 0 : phase, act = handsRest * (turnT > 0 ? 0 : 1);
   const turnK = turnT > 0 ? Math.sin(Math.PI * (1 - turnT)) : 0;
   // left needle: tip nudges toward the right needle while it enters, dips as the old stitch slides off
@@ -1214,11 +1600,17 @@ function frame() {
   hands.rotation.x = -0.15 + (1 - handsRest) * 0.35 + turnK * 0.12; hands.rotation.z = turnK * 0.08;
   myYarnBall.rotation.x += lift ? dt * 1.2 : 0;
   // stitches sit snugly on the needles; each one physically hops from left to right
-  const onRow = me.st % GAUGE, hopped = p > 0.86 && act > 0.5 ? 1 : 0;
+  const onRow = proj.done ? 0 : proj.st % GAUGE, hopped = p > 0.86 && act > 0.5 && !proj.done ? 1 : 0;
   let nR = onRow + hopped, nL = GAUGE - nR;
   if (turnT > 0 && turnT > 0.5) { nR = GAUGE; nL = 0; }
   const shiftR = p > 0.7 && p <= 0.86 ? smooth((p - 0.7) / 0.16) : 0;
   const pushL = hopped ? smooth((p - 0.86) / 0.14) : 1;
+  const Rrow = Math.floor(proj.st / GAUGE);
+  loopsL.forEach((l, k) => { if (k < nL) setCol(l.material, stitchColor(Rrow - 1, GAUGE - 1 - nR - k)); });
+  loopsR.forEach((l, k) => { if (k < nR) setCol(l.material, stitchColor(nR === GAUGE && turnT > 0.5 ? Rrow - 1 : Rrow, GAUGE - nR + k)); });
+  const curCol = stitchColor(Rrow, GAUGE - 1 - onRow);
+  setCol(hopLoop.material, curCol); setCol(yarnMat, curCol); setCol(myYarnBall.material, curCol);
+  fabNR = nR;
   loopsL.forEach((l, k) => { l.visible = k < nL; l.position.y = NEEDLE_REACH - 0.006 - (k + 1 - pushL) * SP; });
   loopsR.forEach((l, k) => { l.visible = k < nR; l.position.y = NEEDLE_REACH - 0.012 - (k + (hopped ? 0 : shiftR)) * SP; });
   if (act > 0.5 && p > 0.55 && p < 0.86) {
@@ -1232,7 +1624,7 @@ function frame() {
   for (let k = nL - 1; k >= 0 && ci < GAUGE; k--) { loopsL[k].getWorldPosition(tmpP); _top[ci++].copy(hands.worldToLocal(tmpP)).add(new THREE.Vector3(0, -0.006, 0)); }
   for (let k = 0; k < nR && ci < GAUGE; k++) { loopsR[k].getWorldPosition(tmpP); _top[ci++].copy(hands.worldToLocal(tmpP)).add(new THREE.Vector3(0, -0.006, 0)); }
   while (ci < GAUGE) { _top[ci].copy(_top[Math.max(0, ci - 1)]); ci++; }
-  updateFabric(t, Math.floor(me.st / GAUGE));
+  updateFabric(t, Math.floor(proj.st / GAUGE) - (turnT > 0.5 ? 1 : 0)); updateDeco();
   // yarn runs to the needle tip while it is being wrapped, otherwise to the newest stitch
   if (wrapK) yarnEnd.copy(tipLocal(needleR, NEEDLE_REACH + 0.01)).add(new THREE.Vector3(Math.cos(wrapK * 6.283) * 0.008, Math.sin(wrapK * 6.283) * 0.008, 0));
   else if (nR > 0) hands.worldToLocal(loopsR[0].getWorldPosition(yarnEnd));
@@ -1302,6 +1694,7 @@ function frame() {
   yarnBall.position.lerp(ballPos, ph.name === 'play' ? 0.2 : 0.05);
   head.rotation.set(pose.hrx + (ph.name === 'sit' ? Math.sin(t * 0.8) * 0.06 : 0), headYaw, pose.hrz + (ph.name === 'sit' ? Math.sin(t * 0.5) * 0.12 : 0));
   // purr wiggle when petted
+  updateCatScarf();
   if (now < purrUntil) { head.rotation.z += Math.sin(t * 30) * 0.03; body.scale.x *= 1 + Math.sin(t * 40) * 0.01; }
   if (ac && purrGain) purrGain.gain.setTargetAtTime(soundOn && (now < purrUntil || ph.name === 'sleep') ? (now < purrUntil ? 0.35 : 0.06) : 0, ac.currentTime, 0.2);
 
