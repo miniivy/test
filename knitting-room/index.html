@@ -193,6 +193,7 @@ body.idle .calm { bottom: calc(40px + env(safe-area-inset-bottom, 0px)); }
       </form>
       <button class="pet" id="soundBtn" aria-pressed="false">소리 켜기</button>
       <button class="pet" id="viewBtn">방 둘러보기</button>
+      <button class="pet" id="gyroBtn" aria-pressed="false">기울여 보기</button>
       <button class="pet" id="speedBtn">속도: 느긋하게</button>
       <button class="pet" id="petBtn">쓰다듬기</button>
       <button class="knit" id="pauseBtn" aria-pressed="false">잠시 쉬기<small>Space</small></button>
@@ -210,7 +211,7 @@ body.idle .calm { bottom: calc(40px + env(safe-area-inset-bottom, 0px)); }
     <div class="swatches" id="swatches"></div>
   </div>
   <div class="row"><span>화질</span><button class="iconbtn" id="hqBtn">높게</button></div>
-  <p class="hint" style="margin:0">손은 알아서 천천히 떠요. 가만히 바라보고 있으면 화면의 버튼들이 조용히 사라져요. 드래그하면 주위를 둘러볼 수 있고, 고양이를 클릭하면 쓰다듬어요. 이 링크를 받은 사람이 들어오면 빈 의자에 앉아 함께 떠요.</p>
+  <p class="hint" style="margin:0">손은 알아서 천천히 떠요. 가만히 바라보고 있으면 화면의 버튼들이 조용히 사라져요. 드래그나 방향키로 360° 둘러볼 수 있고(휴대폰은 "기울여 보기"), 고양이를 클릭하면 쓰다듬어요. 이 링크를 받은 사람이 들어오면 빈 의자에 앉아 함께 떠요.</p>
   <p class="hint" style="margin:0">손 모델: WebXR Input Profiles generic-hand, © 2019 Amazon, MIT 라이선스</p>
 </div>
 
@@ -560,8 +561,9 @@ function fabricTex(col) {
   return t;
 }
 const chairCols = ['#7b2e3a', '#3f4f6b', '#6b5a3a', '#4f6b5a', '#6b3f5a', '#5a4a3a'];
+const seatGroups = [];
 SEATS.forEach((s, i) => {
-  const g = new THREE.Group(); const p = seatXZ(i, 0.15); g.position.copy(p); g.lookAt(0, 0, 0);
+  const g = new THREE.Group(); seatGroups.push(g); const p = seatXZ(i, 0.15); g.position.copy(p); g.lookAt(0, 0, 0);
   const col = s.chair ? chairCols[i % 6] : YARNS[i % YARNS.length].c;
   if (s.chair) {
     const ft = fabricTex(col); const mat = std('#ffffff', 0.95, { map: ft, bumpMap: ft, bumpScale: 0.04 });
@@ -612,7 +614,10 @@ function setScarf(mesh, st) {
 
 // ---------- my hands (attached to camera) ----------
 const skin = std('#e9c2a0', 0.7);
-const hands = new THREE.Group(); hands.position.set(0, -0.3, -0.6); hands.scale.setScalar(1.0); camera.add(hands);
+// the body faces the cat; the head turns freely on top of it, so the hands stay in the lap when you look around
+const bodyRig = new THREE.Group(); bodyRig.rotation.order = 'YXZ'; scene.add(bodyRig);
+const REST_PITCH = -0.58;
+const hands = new THREE.Group(); hands.position.set(0, -0.3, -0.6); hands.scale.setScalar(1.0); bodyRig.add(hands);
 const handL = new THREE.Mesh(new THREE.SphereGeometry(0.075, 16, 12), skin); handL.scale.set(1, 0.75, 1.25); handL.position.set(-0.17, 0, 0); hands.add(handL); handL.visible = false;
 const handR = handL.clone(); handR.position.x = 0.17; hands.add(handR); handR.visible = false;
 const sleeveMat = std(me.color, 1, { map: knitTexture(me.color), bumpScale: 0.05 }); sleeveMat.bumpMap = sleeveMat.map;
@@ -1192,8 +1197,35 @@ function syncAvatars(now) {
 
 // ---------- camera & look ----------
 let yaw = 0, pitch = -0.58, yawT = 0, pitchT = -0.58;
+// ---------- gyroscope: turn the phone to look around the room ----------
+const gyro = { on: false, has: false, yaw: 0, pitch: 0, yawOff: 0, first: true, timer: 0 };
+const _gq = new THREE.Quaternion(), _ge = new THREE.Euler(), _q1 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5)), _q0 = new THREE.Quaternion(), _zee = new THREE.Vector3(0, 0, 1);
+function onOrient(e) {
+  if (e.alpha == null && e.beta == null) return;
+  const d = THREE.MathUtils.degToRad;
+  const orient = d((screen.orientation && screen.orientation.angle) || window.orientation || 0);
+  _ge.set(d(e.beta || 0), d(e.alpha || 0), -d(e.gamma || 0), 'YXZ');
+  _gq.setFromEuler(_ge).multiply(_q1).multiply(_q0.setFromAxisAngle(_zee, -orient));
+  _ge.setFromQuaternion(_gq, 'YXZ');
+  if (gyro.first) { gyro.first = false; gyro.yawOff = yaw - _ge.y; clearTimeout(gyro.timer); toast('폰을 돌리면 방이 따라 돌아요'); }
+  gyro.has = true; gyro.yaw = _ge.y; gyro.pitch = _ge.x;
+}
+async function setGyro(on) {
+  const btn = document.getElementById('gyroBtn');
+  if (on) {
+    try { if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') { const r = await DeviceOrientationEvent.requestPermission(); if (r !== 'granted') throw new Error('denied'); } }
+    catch (err) { toast('기울기 센서를 쓸 수 없어요. 드래그로 둘러봐 주세요'); return; }
+    gyro.on = true; gyro.has = false; gyro.first = true;
+    window.addEventListener('deviceorientation', onOrient);
+    gyro.timer = setTimeout(() => { if (!gyro.has) { setGyro(false); toast('이 화면에서는 기울기 센서가 막혀 있어요. 드래그나 방향키로 360° 둘러볼 수 있어요'); } }, 1600);
+  } else {
+    gyro.on = false; gyro.has = false; window.removeEventListener('deviceorientation', onOrient); clearTimeout(gyro.timer);
+  }
+  btn.setAttribute('aria-pressed', String(gyro.on)); btn.textContent = gyro.on ? '기울여 보기 끄기' : '기울여 보기';
+}
 const camBase = new THREE.Vector3();
 function placeCamera() {
+  seatGroups.forEach((g, i) => { g.visible = i !== me.seat; });   // your own chair would fill the view when you turn round
   const p = seatXZ(me.seat, 0.05); const s = SEATS[me.seat];
   camBase.set(p.x, s.chair ? 1.25 : 1.0, p.z);
 }
@@ -1202,7 +1234,8 @@ let dragging = false, lx = 0, ly = 0, moved = 0;
 canvas.addEventListener('pointerdown', e => { dragging = true; lx = e.clientX; ly = e.clientY; moved = 0; canvas.setPointerCapture(e.pointerId); });
 canvas.addEventListener('pointermove', e => {
   if (!dragging) return; const dx = e.clientX - lx, dy = e.clientY - ly; lx = e.clientX; ly = e.clientY; moved += Math.abs(dx) + Math.abs(dy);
-  yawT = Math.max(-1.6, Math.min(1.6, yawT - dx * 0.004)); pitchT = Math.max(-1.0, Math.min(0.5, pitchT - dy * 0.004));
+  if (gyro.on) gyro.yawOff -= dx * 0.004; else yawT -= dx * 0.004;
+  pitchT = Math.max(-1.25, Math.min(1.1, pitchT - dy * 0.004));
 });
 canvas.addEventListener('pointerup', e => {
   dragging = false;
@@ -1303,13 +1336,18 @@ function applySpeed() { me.sp = SPEEDS[speedI].ms; speedBtn.textContent = '속�
 speedBtn.addEventListener('click', () => { speedI = (speedI + 1) % SPEEDS.length; applySpeed(); pushPresence(); });
 applySpeed();
 let viewMode = 'hands';
-function applyView() { pitchT = viewMode === 'hands' ? -0.58 : -0.22; yawT = 0; viewBtn.textContent = viewMode === 'hands' ? '방 둘러보기' : '손 가까이 보기'; }
+function applyView() { pitchT = viewMode === 'hands' ? REST_PITCH : -0.22; yawT = Math.round(yawT / (Math.PI * 2)) * Math.PI * 2; gyro.yawOff = gyro.on ? -gyro.yaw : gyro.yawOff; viewBtn.textContent = viewMode === 'hands' ? '방 둘러보기' : '손 가까이 보기'; }
+document.getElementById('gyroBtn').addEventListener('click', () => setGyro(!gyro.on));
 viewBtn.addEventListener('click', () => { viewMode = viewMode === 'hands' ? 'room' : 'hands'; applyView(); });
 window.addEventListener('keydown', e => {
   if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
   if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) togglePause(); }
   if (e.key === 'p') petCat();
   if (e.key === 'v') { viewMode = viewMode === 'hands' ? 'room' : 'hands'; applyView(); }
+  if (e.key === 'ArrowLeft' || e.key === 'a') { e.preventDefault(); if (gyro.on) gyro.yawOff += 0.35; else yawT += 0.35; }
+  if (e.key === 'ArrowRight' || e.key === 'd') { e.preventDefault(); if (gyro.on) gyro.yawOff -= 0.35; else yawT -= 0.35; }
+  if (e.key === 'ArrowUp' || e.key === 'w') { e.preventDefault(); pitchT = Math.min(1.1, pitchT + 0.2); }
+  if (e.key === 'ArrowDown' || e.key === 's') { e.preventDefault(); pitchT = Math.max(-1.25, pitchT - 0.2); }
 });
 // quiet mode: the buttons fade away while you just watch
 let idleT = 0;
@@ -1566,10 +1604,13 @@ function frame() {
   const dt = Math.min(clock.getDelta(), 0.05), now = performance.now(), t = now / 1000;
   // camera
   yaw = lerp(yaw, yawT, 0.12); pitch = lerp(pitch, pitchT, 0.12);
-  if (!dragging) { yawT *= 0.995; }
   const base = Math.atan2(camBase.x, camBase.z);
   camera.position.copy(camBase); camera.position.y += Math.sin(t * 1.1) * 0.006;
+  if (gyro.on && gyro.has) { yawT = gyro.yaw + gyro.yawOff; pitchT = Math.max(-1.25, Math.min(1.1, gyro.pitch)); }
+  // take the short way round when the target wraps past a full turn
+  while (yawT - yaw > Math.PI) yaw += Math.PI * 2; while (yawT - yaw < -Math.PI) yaw -= Math.PI * 2;
   camera.rotation.order = 'YXZ'; camera.rotation.set(pitch, base + yaw, 0);
+  bodyRig.position.copy(camBase); bodyRig.rotation.set(REST_PITCH, base, 0);
   // hands: insert front-to-back, throw the yarn, draw the loop through, slip the old stitch off
   const restK = me.knitting ? 1 : 0; handsRest = lerp(handsRest, restK, 0.035);
   if (turnT > 0) turnT = Math.max(0, turnT - dt / 1.8);
@@ -1631,7 +1672,8 @@ function frame() {
   else yarnEnd.copy(tipLocal(needleR, NEEDLE_REACH - 0.012));
   updateYarn(t);
   // eyes follow the needle tips: focus on the hands, or on the cat when looking around
-  focusDist = lerp(focusDist, viewMode === 'hands' ? 0.62 : 2.5, 0.05);
+  const lookingAtLap = Math.abs(Math.atan2(Math.sin(yaw), Math.cos(yaw))) < 0.6 && pitch < -0.3;
+  focusDist = lerp(focusDist, lookingAtLap ? 0.62 : 2.5, 0.05);
   if (bokeh) bokeh.uniforms.focus.value = focusDist;
   // fire
   flames.forEach(f => {
