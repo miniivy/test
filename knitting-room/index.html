@@ -159,6 +159,7 @@ body.idle .calm { bottom: calc(40px + env(safe-area-inset-bottom, 0px)); }
   </div>
   <div class="row"><span>화질</span><button class="iconbtn" id="hqBtn">높게</button></div>
   <p class="hint" style="margin:0">손은 알아서 천천히 떠요. 가만히 바라보고 있으면 화면의 버튼들이 조용히 사라져요. 드래그하면 주위를 둘러볼 수 있고, 고양이를 클릭하면 쓰다듬어요. 이 링크를 받은 사람이 들어오면 빈 의자에 앉아 함께 떠요.</p>
+  <p class="hint" style="margin:0">손 모델: WebXR Input Profiles generic-hand, © 2019 Amazon, MIT 라이선스</p>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -170,6 +171,9 @@ body.idle .calm { bottom: calc(40px + env(safe-area-inset-bottom, 0px)); }
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/BokehShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/BokehPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script>
 (() => {
 'use strict';
@@ -237,7 +241,7 @@ const GradeShader = {
     '}'
   ].join('\n')
 };
-let composer = null, bloom = null, gradePass = null;
+let composer = null, bloom = null, gradePass = null, bokeh = null, focusDist = 0.62;
 function buildComposer() {
   if (composer) { composer.renderTarget1.dispose(); composer.renderTarget2.dispose(); composer = null; }
   if (!hq || !THREE.EffectComposer || !THREE.UnrealBloomPass) return;
@@ -249,6 +253,7 @@ function buildComposer() {
   composer = new THREE.EffectComposer(renderer, rt);
   composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(window.innerWidth, window.innerHeight);
   composer.addPass(new THREE.RenderPass(scene, camera));
+  if (THREE.BokehPass) { bokeh = new THREE.BokehPass(scene, camera, { focus: focusDist, aperture: 0.0022, maxblur: 0.0055, width: window.innerWidth, height: window.innerHeight }); composer.addPass(bokeh); }
   bloom = new THREE.UnrealBloomPass(new THREE.Vector2(window.innerWidth / 2, window.innerHeight / 2), 0.75, 0.6, 0.72);
   composer.addPass(bloom);
   gradePass = new THREE.ShaderPass(GradeShader); composer.addPass(gradePass);
@@ -554,7 +559,7 @@ function buildHand(side) {
   const wrist = new THREE.Mesh(capsule(0.024, 0.027, 0.075), skinMat); wrist.rotation.x = Math.PI; wrist.position.y = 0.01; wrist.scale.set(1.22, 1, 0.72); hand.add(wrist);
   const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.052, 0.06, 24, 1, true), sleeveMat); cuff.position.y = -0.075; cuff.scale.set(1.1, 1, 0.85); hand.add(cuff);
   const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.056, 0.068, 0.42, 24), sleeveMat); sleeve.position.y = -0.31; sleeve.scale.set(1.1, 1, 0.9); sleeve.castShadow = true; hand.add(sleeve);
-  return { hand, fingers, thumb: [t0, t1, t2] };
+  return { hand, fingers, thumb: [t0, t1, t2], parts: [palm, thenar, hypo, wrist, t0, ...fingers.map(j => j[0])] };
 }
 // place a hand on a needle: the needle crosses the palm diagonally, from the heel of the hand
 // out between thumb and index finger, with the back of the hand facing up toward the eyes
@@ -563,7 +568,7 @@ function gripOnNeedle(h, needle, side, alongY) {
   const m = new THREE.Matrix4().set(c.x, c.y, c.z, 0, d.x, d.y, d.z, 0, b.x, b.y, b.z, 0, 0, 0, 0, 1);
   const grip = new THREE.Group(); grip.position.y = alongY; grip.rotation.y = -0.55 * side; needle.add(grip);
   h.hand.quaternion.setFromRotationMatrix(m);
-  const g = new THREE.Vector3(0.002 * side, 0.052, -0.021).applyMatrix4(m);
+  const g = new THREE.Vector3(0.002 * side, 0.06, -0.026).applyMatrix4(m);
   h.hand.position.copy(g.negate()); grip.add(h.hand); h.grip = grip;
 }
 const rightHand = buildHand(1), leftHand = buildHand(-1);
@@ -582,15 +587,149 @@ function poseHand(h, t, lift, phaseOff) {
   });
   h.thumb[1].rotation.x = -0.2 - lift * 0.15; h.thumb[2].rotation.x = -0.25 - lift * 0.1;
 }
+// ---------- photographed-hand model (WebXR generic hand, MIT) driven bone by bone ----------
+const skinModelMat = new THREE.MeshStandardMaterial({ color: '#c27f63', roughness: 0.5, metalness: 0, skinning: true, emissive: '#5c1d12', emissiveIntensity: 0.08 });
+skinModelMat.onBeforeCompile = sh => {
+  // thin-skin look: warm light bleeding through the edges of fingers
+  sh.fragmentShader = sh.fragmentShader.replace('#include <dithering_fragment>',
+    'float rim = pow(1.0 - clamp(dot(normalize(vNormal), normalize(vViewPosition)), 0.0, 1.0), 2.5);\n gl_FragColor.rgb += vec3(0.42, 0.12, 0.07) * rim * 0.55;\n #include <dithering_fragment>');
+};
+const FLEX = a => new THREE.Matrix4().makeRotationX(-a);
+const SPREAD = a => new THREE.Matrix4().makeRotationY(a);
+const CHAINS = {
+  thumb: ['thumb-metacarpal', 'thumb-phalanx-proximal', 'thumb-phalanx-distal', 'thumb-tip'],
+  index: ['index-finger-metacarpal', 'index-finger-phalanx-proximal', 'index-finger-phalanx-intermediate', 'index-finger-phalanx-distal', 'index-finger-tip'],
+  middle: ['middle-finger-metacarpal', 'middle-finger-phalanx-proximal', 'middle-finger-phalanx-intermediate', 'middle-finger-phalanx-distal', 'middle-finger-tip'],
+  ring: ['ring-finger-metacarpal', 'ring-finger-phalanx-proximal', 'ring-finger-phalanx-intermediate', 'ring-finger-phalanx-distal', 'ring-finger-tip'],
+  pinky: ['pinky-finger-metacarpal', 'pinky-finger-phalanx-proximal', 'pinky-finger-phalanx-intermediate', 'pinky-finger-phalanx-distal', 'pinky-finger-tip']
+};
+function attachModelHand(h, gltf) {
+  const root = gltf.scene; root.updateMatrixWorld(true);
+  const bones = {}; root.traverse(o => { if (o.isBone || CHAINS.index.includes(o.name) || o.name === 'wrist' || /finger|thumb/.test(o.name)) bones[o.name] = o; if (o.isSkinnedMesh) { o.material = skinModelMat; o.castShadow = true; o.frustumCulled = false; } });
+  if (!bones.wrist) return false;
+  const rest = {}; Object.keys(bones).forEach(n => { rest[n] = bones[n].matrix.clone(); });
+  const W = bones.wrist.matrixWorld.clone();
+  const align = new THREE.Group(); align.matrixAutoUpdate = false;
+  align.matrix.copy(new THREE.Matrix4().makeRotationX(Math.PI / 2).multiply(W.clone().invert()));
+  align.add(root);
+  const holder = new THREE.Group(); holder.add(align); h.hand.add(holder);
+  h.parts.forEach(m => { m.visible = false; });
+  h.model = { bones, rest, holder };
+  return true;
+}
+const _m = new THREE.Matrix4(), _rel = new THREE.Matrix4();
+function poseChain(model, names, angles, spread) {
+  const { bones, rest } = model; let P = rest[names[0]].clone();
+  bones[names[0]].matrix.copy(P);
+  for (let i = 1; i < names.length; i++) {
+    const b = bones[names[i]]; if (!b) continue;
+    _rel.copy(rest[names[i - 1]]).invert().multiply(rest[names[i]]);
+    P = P.clone().multiply(_rel);
+    const a = angles[i - 1] || 0;
+    if (a) P.multiply(FLEX(a));
+    if (i === 1 && spread) P.multiply(SPREAD(spread));
+    b.matrix.copy(P); b.matrix.decompose(b.position, b.quaternion, b.scale);
+  }
+}
+// grip curls (proximal, middle, distal) — added on top of the model's relaxed rest pose
+function poseModelHand(h, t, lift, side, push) {
+  const md = h.model; if (!md) return;
+  const br = (i) => Math.sin(t * 0.8 + i * 1.3 + side) * 0.03;
+  poseChain(md, CHAINS.index, [0.35 - lift * 0.45 + br(0) + push * 0.2, 0.55 - lift * 0.35, 0.3 - lift * 0.15], -0.05 * side * lift);
+  poseChain(md, CHAINS.middle, [0.95 + br(1), 1.05, 0.55], 0);
+  poseChain(md, CHAINS.ring, [1.05 + br(2), 1.1, 0.6], 0);
+  poseChain(md, CHAINS.pinky, [1.1 + br(3), 1.05, 0.55], 0);
+  poseChain(md, CHAINS.thumb, [0.15 + push * 0.25, 0.25 + push * 0.2, 0.2], 0);
+}
+if (THREE.GLTFLoader) {
+  const loader = new THREE.GLTFLoader();
+  // the models ship beside the page as base64 text (the artifact host serves text, not .glb)
+  [['hands/right.glb.b64.txt', () => rightHand], ['hands/left.glb.b64.txt', () => leftHand]].forEach(([url, get]) => {
+    fetch(url).then(r => { if (!r.ok) throw new Error(r.status); return r.text(); }).then(txt => {
+      const bin = atob(txt.trim()), buf = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+      loader.parse(buf.buffer, '', g => { try { attachModelHand(get(), g); } catch (e) { console.warn('hand model', e); } }, () => {});
+    }).catch(() => {});  // keep the hand-built hands if the model can't load
+  });
+}
+
+// ---------- the knitted fabric, hanging from the live stitches on both needles ----------
+const FAB_ROWS = 20, ROW_H = 0.0105;
+const fabricTexture = () => { const t = knitTexture(me.color); t.repeat.set(GAUGE / 8, 1); return t; };
+const fabricMat = std('#ffffff', 1, { side: THREE.DoubleSide });
+function refreshFabricMat() { fabricMat.map = fabricTexture(); fabricMat.bumpMap = fabricMat.map; fabricMat.bumpScale = 0.04; fabricMat.needsUpdate = true; }
+refreshFabricMat();
+const fabricGeo = new THREE.PlaneGeometry(1, 1, GAUGE - 1, FAB_ROWS);
+const fabric = new THREE.Mesh(fabricGeo, fabricMat); fabric.castShadow = true; fabric.frustumCulled = false; hands.add(fabric);
+const _g = new THREE.Vector3(), _q = new THREE.Quaternion(), _top = [];
+for (let i = 0; i < GAUGE; i++) _top.push(new THREE.Vector3());
+function updateFabric(t, rowsDone) {
+  hands.getWorldQuaternion(_q); _g.set(0, -1, 0).applyQuaternion(_q.invert());
+  _g.z += 0.35; _g.normalize();
+  const shown = Math.min(FAB_ROWS, rowsDone + 9);
+  const pos = fabricGeo.attributes.position;
+  for (let r = 0; r <= FAB_ROWS; r++) {
+    const dr = Math.min(r, shown) * ROW_H, fold = Math.max(0, r - shown);
+    for (let c = 0; c < GAUGE; c++) {
+      const tp = _top[c];
+      const sway = Math.sin(t * 0.7 + c * 0.15) * 0.0012 * r + Math.sin(t * 1.3 + r * 0.4) * 0.0006 * r;
+      // columns bunch toward the middle as they hang, like real fabric pulled by two needles
+      const mid = (c - (GAUGE - 1) / 2) / GAUGE;
+      pos.setXYZ(r * GAUGE + c,
+        tp.x + _g.x * dr - mid * dr * 0.35 + sway,
+        tp.y + _g.y * dr - fold * 0.0001,
+        tp.z + _g.z * dr + (r > 0 ? Math.sin(c * 0.9 + r) * 0.0008 : 0));
+    }
+  }
+  pos.needsUpdate = true; fabricGeo.computeVertexNormals();
+  fabricMat.map.repeat.set(GAUGE / 8, Math.max(0.15, shown / 8));
+  fabricMat.map.offset.y = -shown / 8;
+}
+
+// ---------- knitting motion: needles are driven by where their tips must go ----------
+const NEEDLE_REACH = 0.42, SP = 0.0128;
+const BASE = {
+  L: { pos: new THREE.Vector3(-0.2, 0.02, 0), q: new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.95, 0, -0.85)) },
+  R: { pos: new THREE.Vector3(0.2, 0.02, 0), q: new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.95, 0, 0.85)) }
+};
+const _up = new THREE.Vector3(0, 1, 0);
+BASE.L.dir = _up.clone().applyQuaternion(BASE.L.q); BASE.R.dir = _up.clone().applyQuaternion(BASE.R.q);
+BASE.L.tip = BASE.L.pos.clone().addScaledVector(BASE.L.dir, NEEDLE_REACH);
+BASE.R.tip = BASE.R.pos.clone().addScaledVector(BASE.R.dir, NEEDLE_REACH);
+function aimNeedle(needle, base, handle, tip) {
+  const dir = tip.clone().sub(handle).normalize();
+  needle.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(base.dir, dir).multiply(base.q));
+  needle.position.copy(tip).addScaledVector(dir, -NEEDLE_REACH);
+}
+const smooth = x => { x = Math.min(1, Math.max(0, x)); return x * x * x * (x * (x * 6 - 15) + 10); };
+// one stitch, as keyframes of the right needle tip relative to the front stitch on the left needle
+function stitchPath(p, S, amp) {
+  const front = new THREE.Vector3(0.004, 0.006, 0.032), back = new THREE.Vector3(-0.004, -0.008, -0.024);
+  const restOff = BASE.R.tip.clone().sub(BASE.L.tip).multiplyScalar(0.5).add(new THREE.Vector3(0.03, 0.01, 0.02));
+  const K = [
+    [0.00, restOff],
+    [0.16, front.clone().multiplyScalar(amp)],
+    [0.30, back.clone().multiplyScalar(amp)],
+    [0.55, back.clone().multiplyScalar(amp).add(new THREE.Vector3(0.002, 0.003, 0))],
+    [0.74, front.clone().multiplyScalar(amp).add(new THREE.Vector3(0, 0.008, 0.004))],
+    [1.00, restOff]
+  ];
+  let i = 0; while (i < K.length - 2 && p > K[i + 1][0]) i++;
+  const k = smooth((p - K[i][0]) / (K[i + 1][0] - K[i][0]));
+  return S.clone().add(K[i][1].clone().lerp(K[i + 1][1], k));
+}
+let stitchDur = 1, stitchAmp = 1, turnT = 0;
+function newStitchFeel() { stitchDur = 0.88 + Math.random() * 0.26; stitchAmp = 0.88 + Math.random() * 0.24; }
+newStitchFeel();
 const myScarfHolder = new THREE.Group(); myScarfHolder.position.set(-0.05, 0.02, -0.02); hands.add(myScarfHolder);
-let myScarf = makeScarf(me.color, 0.2); myScarfHolder.add(myScarf); setScarf(myScarf, me.st);
+let myScarf = makeScarf(me.color, 0.2); myScarfHolder.add(myScarf); setScarf(myScarf, me.st); myScarfHolder.visible = false;
 const myYarnBall = new THREE.Mesh(new THREE.SphereGeometry(0.06, 14, 10), std(me.color, 1, { map: knitTexture(me.color) })); myYarnBall.position.set(0.32, -0.28, 0.05); hands.add(myYarnBall);
 // live stitches sitting on each needle (they hop from left to right one by one)
 const loopMat = std(me.color, 0.9);
-const loopGeo = new THREE.TorusGeometry(0.02, 0.0065, 6, 14);
+const loopGeo = new THREE.TorusGeometry(0.0115, 0.0034, 8, 18);
 function mkLoops(needle) {
   const arr = [];
-  for (let i = 0; i < 10; i++) { const l = new THREE.Mesh(loopGeo, loopMat); l.rotation.x = Math.PI / 2; l.position.y = 0.08 + i * 0.03; needle.add(l); arr.push(l); }
+  for (let i = 0; i < GAUGE; i++) { const l = new THREE.Mesh(loopGeo, loopMat); l.rotation.set(Math.PI / 2 + (Math.random() - 0.5) * 0.25, (Math.random() - 0.5) * 0.3, (Math.random() - 0.5) * 0.4); l.scale.set(1, 1, 0.85 + Math.random() * 0.3); l.castShadow = true; needle.add(l); arr.push(l); }
   return arr;
 }
 const loopsL = mkLoops(needleL), loopsR = mkLoops(needleR);
@@ -599,10 +738,14 @@ const hopLoop = new THREE.Mesh(loopGeo, loopMat); hands.add(hopLoop);
 const yarnMat = std(me.color, 0.9);
 let yarnMesh = null;
 const tipLocal = (needle, y) => new THREE.Vector3(0, y, 0).applyQuaternion(needle.quaternion).add(needle.position);
+const yarnEnd = new THREE.Vector3();
 function updateYarn(t) {
   const a = myYarnBall.position.clone();
-  const hr = new THREE.Vector3(); rightHand.fingers[0][2].getWorldPosition(hr); hands.worldToLocal(hr);
-  const tip = tipLocal(needleR, 0.42);
+  const hr = new THREE.Vector3();
+  if (rightHand.model && rightHand.model.bones['index-finger-tip']) rightHand.model.bones['index-finger-tip'].getWorldPosition(hr);
+  else rightHand.fingers[0][2].getWorldPosition(hr);
+  hands.worldToLocal(hr);
+  const tip = yarnEnd.clone();
   const mid = a.clone().lerp(hr, 0.5); mid.y -= 0.06 + Math.sin(t * 0.8) * 0.01; mid.z += 0.02;
   const curve = new THREE.CatmullRomCurve3([a, mid, hr, tip]);
   if (yarnMesh) { hands.remove(yarnMesh); yarnMesh.geometry.dispose(); }
@@ -610,7 +753,7 @@ function updateYarn(t) {
 }
 
 function refreshMyColor() {
-  loopMat.color.set(me.color); yarnMat.color.set(me.color);
+  loopMat.color.set(me.color); yarnMat.color.set(me.color); refreshFabricMat();
   sleeveMat.color.set('#ffffff'); sleeveMat.map = knitTexture(me.color); sleeveMat.map.repeat.set(2, 1); sleeveMat.bumpMap = sleeveMat.map; sleeveMat.needsUpdate = true;
   myYarnBall.material.map = knitTexture(me.color); myYarnBall.material.needsUpdate = true;
   myScarfHolder.remove(myScarf); myScarf = makeScarf(me.color, 0.2); myScarfHolder.add(myScarf); setScarf(myScarf, me.st);
@@ -1041,33 +1184,63 @@ function frame() {
   const base = Math.atan2(camBase.x, camBase.z);
   camera.position.copy(camBase); camera.position.y += Math.sin(t * 1.1) * 0.006;
   camera.rotation.order = 'YXZ'; camera.rotation.set(pitch, base + yaw, 0);
-  // hands: one calm stitch cycle = insert, wrap, pull through, slip off
-  if (me.knitting) { phase += dt * 1000 / me.sp; if (phase >= 1) { phase -= 1; completeStitch(); } }
-  const p = phase, ease = x => x * x * (3 - 2 * x);
-  const restK = me.knitting ? 1 : 0; handsRest = lerp(handsRest, restK, 0.04);
-  const ins = Math.sin(Math.PI * Math.min(1, p / 0.85)) * handsRest;            // right tip dives into the front loop
-  const wrapA = p > 0.3 && p < 0.6 ? (p - 0.3) / 0.3 * Math.PI * 2 : 0;         // yarn hand circles once
-  const slip = p > 0.8 ? ease((p - 0.8) / 0.2) : 0;
-  needleL.rotation.set(-0.95 + 0.08 * ins, 0.1 * ins, -0.85 + 0.1 * ins - 0.08 * slip * handsRest);
-  needleR.rotation.set(-0.95 + 0.18 * ins, -0.1 * ins, 0.85 - 0.42 * ins);
-  needleR.position.set(0.2 - 0.05 * ins, 0.02 + 0.02 * ins, 0.0);
-  handL.position.set(-0.17, Math.sin(t * 1.1) * 0.004 + 0.008 * ins, 0);
-  handR.position.set(0.17 - 0.05 * ins + (wrapA ? (Math.cos(wrapA) - 1) * 0.012 : 0), Math.sin(t * 1.1 + 1) * 0.004 + 0.012 * ins + (wrapA ? Math.sin(wrapA) * 0.014 : 0), 0);
-  poseHand(rightHand, t, wrapA ? Math.sin(wrapA / 2) : 0, 0); poseHand(leftHand, t, 0, 2);
-  rightHand.grip.rotation.y = -0.55 + (wrapA ? Math.sin(wrapA) * 0.12 : 0);
-  hands.position.y = -0.3 - (1 - handsRest) * 0.14; hands.rotation.x = -0.15 + (1 - handsRest) * 0.35;
-  myYarnBall.rotation.x += wrapA ? dt * 1.5 : 0; myScarfHolder.rotation.x = Math.sin(t * 0.7) * 0.03 + 0.25;
-  // stitches: left needle empties as the right one fills; the moving loop hops across near the end of each cycle
-  const onRow = me.st % GAUGE, moved = p > 0.86 && me.knitting ? 1 : 0;
-  const leftN = Math.min(10, Math.ceil((GAUGE - onRow - moved) / 2)), rightN = Math.min(10, Math.ceil((onRow + moved) / 2));
-  loopsL.forEach((l, i) => { l.visible = i < leftN; });
-  loopsR.forEach((l, i) => { l.visible = i < rightN; });
-  if (me.knitting && p > 0.55 && p < 0.86) {
-    const k = ease((p - 0.55) / 0.31);
-    hopLoop.visible = true; hopLoop.position.copy(tipLocal(needleL, 0.38).lerp(tipLocal(needleR, 0.38), k)); hopLoop.position.y += Math.sin(k * Math.PI) * 0.03;
-    hopLoop.rotation.set(Math.PI / 2, 0, k * 2);
+  // hands: insert front-to-back, throw the yarn, draw the loop through, slip the old stitch off
+  const restK = me.knitting ? 1 : 0; handsRest = lerp(handsRest, restK, 0.035);
+  if (turnT > 0) turnT = Math.max(0, turnT - dt / 1.8);
+  else if (me.knitting) { phase += dt * 1000 / (me.sp * stitchDur); if (phase >= 1) { phase -= 1; completeStitch(); newStitchFeel(); if (me.st % GAUGE === 0) turnT = 1; } }
+  const p = turnT > 0 ? 0 : phase, act = handsRest * (turnT > 0 ? 0 : 1);
+  const turnK = turnT > 0 ? Math.sin(Math.PI * (1 - turnT)) : 0;
+  // left needle: tip nudges toward the right needle while it enters, dips as the old stitch slides off
+  const enter = Math.sin(Math.PI * smooth(p / 0.6)) * act, slipK = (p > 0.74 ? Math.sin(Math.PI * smooth((p - 0.74) / 0.26)) : 0) * act;
+  const Lhandle = BASE.L.pos.clone().add(new THREE.Vector3(Math.sin(t * 0.9) * 0.003, Math.sin(t * 1.1) * 0.003, 0));
+  const Ltip = BASE.L.tip.clone().add(new THREE.Vector3(0.012 * enter, 0.004 * enter - 0.014 * slipK, 0.006 * enter - 0.006 * slipK));
+  aimNeedle(needleL, BASE.L, Lhandle, Ltip);
+  needleL.updateMatrix();
+  const S = tipLocal(needleL, NEEDLE_REACH);              // the front stitch waiting on the left needle
+  const restTip = BASE.R.tip.clone();
+  const Rtip = stitchPath(p, S, stitchAmp).lerp(restTip, 1 - act);
+  const Rhandle = BASE.R.pos.clone().add(new THREE.Vector3(-0.02 * enter, 0.01 * enter + Math.sin(t * 1.1 + 1) * 0.003, 0.01 * enter));
+  aimNeedle(needleR, BASE.R, Rhandle, Rtip);
+  needleR.updateMatrix();
+  // the yarn throw: right index lifts, circles the needle tip, and lays the yarn down
+  const wrapK = p > 0.3 && p < 0.56 ? (p - 0.3) / 0.26 : 0;
+  const lift = wrapK ? Math.sin(Math.PI * wrapK) : 0;
+  poseHand(rightHand, t, lift, 0); poseHand(leftHand, t, 0, 2);
+  poseModelHand(rightHand, t, lift * act, 1, 0);
+  poseModelHand(leftHand, t, 0, -1, slipK);
+  rightHand.grip.rotation.y = -0.55 + Math.sin(Math.PI * 2 * wrapK) * 0.1 * act;
+  rightHand.grip.rotation.x = lift * 0.08 * act;
+  hands.position.y = -0.3 - (1 - handsRest) * 0.14 - turnK * 0.05;
+  hands.rotation.x = -0.15 + (1 - handsRest) * 0.35 + turnK * 0.12; hands.rotation.z = turnK * 0.08;
+  myYarnBall.rotation.x += lift ? dt * 1.2 : 0;
+  // stitches sit snugly on the needles; each one physically hops from left to right
+  const onRow = me.st % GAUGE, hopped = p > 0.86 && act > 0.5 ? 1 : 0;
+  let nR = onRow + hopped, nL = GAUGE - nR;
+  if (turnT > 0 && turnT > 0.5) { nR = GAUGE; nL = 0; }
+  const shiftR = p > 0.7 && p <= 0.86 ? smooth((p - 0.7) / 0.16) : 0;
+  const pushL = hopped ? smooth((p - 0.86) / 0.14) : 1;
+  loopsL.forEach((l, k) => { l.visible = k < nL; l.position.y = NEEDLE_REACH - 0.006 - (k + 1 - pushL) * SP; });
+  loopsR.forEach((l, k) => { l.visible = k < nR; l.position.y = NEEDLE_REACH - 0.012 - (k + (hopped ? 0 : shiftR)) * SP; });
+  if (act > 0.5 && p > 0.55 && p < 0.86) {
+    const k = smooth((p - 0.55) / 0.31);
+    hopLoop.visible = true; hopLoop.position.copy(S.clone().lerp(tipLocal(needleR, NEEDLE_REACH - 0.012), k));
+    hopLoop.quaternion.copy(needleL.quaternion).slerp(needleR.quaternion, k); hopLoop.rotateX(Math.PI / 2);
   } else hopLoop.visible = false;
+  // fabric hangs from the loops: far end of the left needle → its tip → newest on the right → older ones
+  hands.updateMatrixWorld(true);
+  let ci = 0; const tmpP = new THREE.Vector3();
+  for (let k = nL - 1; k >= 0 && ci < GAUGE; k--) { loopsL[k].getWorldPosition(tmpP); _top[ci++].copy(hands.worldToLocal(tmpP)).add(new THREE.Vector3(0, -0.006, 0)); }
+  for (let k = 0; k < nR && ci < GAUGE; k++) { loopsR[k].getWorldPosition(tmpP); _top[ci++].copy(hands.worldToLocal(tmpP)).add(new THREE.Vector3(0, -0.006, 0)); }
+  while (ci < GAUGE) { _top[ci].copy(_top[Math.max(0, ci - 1)]); ci++; }
+  updateFabric(t, Math.floor(me.st / GAUGE));
+  // yarn runs to the needle tip while it is being wrapped, otherwise to the newest stitch
+  if (wrapK) yarnEnd.copy(tipLocal(needleR, NEEDLE_REACH + 0.01)).add(new THREE.Vector3(Math.cos(wrapK * 6.283) * 0.008, Math.sin(wrapK * 6.283) * 0.008, 0));
+  else if (nR > 0) hands.worldToLocal(loopsR[0].getWorldPosition(yarnEnd));
+  else yarnEnd.copy(tipLocal(needleR, NEEDLE_REACH - 0.012));
   updateYarn(t);
+  // eyes follow the needle tips: focus on the hands, or on the cat when looking around
+  focusDist = lerp(focusDist, viewMode === 'hands' ? 0.62 : 2.5, 0.05);
+  if (bokeh) bokeh.uniforms.focus.value = focusDist;
   // fire
   flames.forEach(f => {
     f.age += dt / f.life; if (f.age >= 1) { f.age = 0; f.x = (Math.random() - 0.5) * 0.9; f.w = 0.5 + Math.random() * 0.6; f.life = 0.7 + Math.random() * 0.6; }
